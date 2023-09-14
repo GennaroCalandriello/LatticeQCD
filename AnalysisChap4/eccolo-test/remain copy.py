@@ -1,23 +1,86 @@
-from ast import Is
-import random
-import re
-from turtle import color
-from venv import create
+from email import errors
+from hmac import new
 import numpy as np
 import multiprocessing
 from functools import partial
 from collections import defaultdict
 
-from main import *
 from modulo.functions import *
 from modulo.stats import *
 
-num_bins = 40
+
+def compute_Is0(num_ev, spacing):
+
+    less_than_s_0 = 0
+
+    for s in spacing:
+        if s < s_0:
+            less_than_s_0 += 1
+    Is_0 = less_than_s_0 / num_ev
+
+    return Is_0
+
+
+def loadtxt(newresults=True, topocool=False):
+
+    """Structure of data:
+    1st number: RHMC trajectory
+    2nd number: 1 non ti interessa
+    3rd number: 200 = eigenvalues calculated
+    4th number: 0/1 quark up or down
+    4:204 numbers: eigenvalues
+    204:204+22*200: IPR"""
+
+    if newresults:
+        # new results sent 15/03/2023: this is all the statistics we have
+        edeconfined = np.loadtxt("PhDresults\deconf\deconfined_bz0\deconfined_bz0.txt")
+        econfined = np.loadtxt("PhDresults\conf\confined_bz0\confined_bz0.txt")
+
+    else:
+        edeconfined = np.loadtxt("PhDresults/deconf/deconfined/deconfined_bz0.txt")
+        econfined = np.loadtxt("PhDresults/conf/confined/confined_bz0.txt")
+
+    if topocool:
+
+        TOPOLOGICALconf = np.loadtxt("PhDresults\conf\confined_bz0\TopoCool.txt")
+        TOPOLOGICALdeconf = np.loadtxt("PhDresults\deconf\deconfined_bz0\TopoCool.txt")
+
+        return edeconfined, econfined, TOPOLOGICALdeconf, TOPOLOGICALconf
+
+    else:
+
+        return edeconfined, econfined
+
+
+def loading():
+
+    """This function load the data from the txt file and return max and min values of the spectrum"""
+
+    edeconfined, econfined, topodec, topoconf = loadtxt(topocool=True)
+    print(topodec.shape)
+    edeconfined = np.abs(edeconfined[:, 4:204])
+    econfined = np.abs(econfined[:, 4:204])
+    econfined = econfined[:, ::2]
+    edeconfined = edeconfined[:, ::2]
+
+    configurations = len(edeconfined[:, 0])
+
+    # print max
+    maxdec = np.amax(edeconfined)
+    maxconf = np.amax(econfined)
+    mindec = np.amin(edeconfined)
+    minconf = np.amin(econfined)
+
+    print("maxdeconfined", maxdec)
+    print("maxconfined", maxconf)
+
+    return maxdec, mindec, maxconf, minconf
 
 
 def loadSortRank():
 
-    edeconfined, econfined = loadtxt()
+    edeconfined, econfined, topodec, topoconf = loadtxt(topocool=True)
+    print(topodec.shape)
     edeconfined = np.abs(edeconfined[:, 4:204])
     econfined = np.abs(econfined[:, 4:204])
     econfined = econfined[:, ::2]
@@ -30,8 +93,14 @@ def loadSortRank():
     configurations = len(edeconfined[:, 0])
 
     # print max
-    print("Max deconfined: ", np.amax(edeconfined))
-    print("Max confined: ", np.amax(econfined))
+    maxdec = np.amax(edeconfined)
+    maxconf = np.amax(econfined)
+    mindec = np.amin(edeconfined)
+    minconf = np.amin(econfined)
+
+    print("maxdeconfined", maxdec)
+    print("maxconfined", maxconf)
+
     unsorted_dec = []
     unsorted_conf = []
     ranked_dec = []
@@ -59,46 +128,69 @@ def loadSortRank():
     return ranked_dec, ranked_conf, configurations
 
 
-def spacingCalculus(bins):
+def spacingCalculus(bins, plotto=False):
 
     """This function calculate the spacing distribution for each bin.
     It takes bins in input structured as follows:
     bins = [config_x: [ranked_ev, real_ev], config_y: [ranked_ev, real_ev], ...]"""
 
-    plotto = False
+    # here I want the max and min on all configurations:
+
     mean_spacings = []
-    IS0 = []
+    Is0 = []
+    Is0_with_kde = []
+    errors_Is0 = []
+    errors_mean_spacings = []
+    maxdec, mindec, maxconf, minconf = loading()
 
     # qui ci sono tutti i bins
     for b in range(len(bins) - 1):
         spacing = []
         bin = bins[b]
         bin_next = bins[b + 1]
-
+        count_ev_in_bin = 0
         for config, ranked_ev in bin.items():
-            if config in bin_next:
+
+            if (
+                config in bin_next
+                and len(bin_next[config]) > 0
+                and len(bin[config]) > 0
+            ):
                 last_value = bin[config][-1][
                     0
                 ]  # ok the structure is: bin[config][ranked][real_lambda]
                 first_value_next = bin_next[config][0][0]
                 added_s = first_value_next - last_value
+
             else:
                 added_s = 0
 
             for e in range(len(ranked_ev) - 1):
-                spacing.append((ranked_ev[e + 1][0] - ranked_ev[e][0]))
+                count_ev_in_bin += 1
+                spacing.append(((ranked_ev[e + 1][0] - ranked_ev[e][0])))
 
             spacing.append(added_s)
 
-        print("mean spacing", np.mean(spacing))
+        # spacing for each bin in which the spectrum is divided
+        spacing = np.array(spacing)
+
+        # here I calculate the error on Is0 and on the mean spacing
+        # kind= 1 for Is0, kind=2 for mean spacing
+        errors_Is0.append(errorAnalysis(count_ev_in_bin, spacing, kind=1))
+        errors_mean_spacings.append(errorAnalysis(count_ev_in_bin, spacing, kind=2))
+
+        # here I calculate Is0 and Is0 with kde
+        Is0.append(compute_Is0(count_ev_in_bin, spacing))
+        Is0_with_kde.append(
+            KernelDensityFunctionIntegrator(spacing, FreedmanDiaconis(spacing))
+        )
+
+        # print("mean spacing", np.mean(spacing))
         mean_spacings.append(np.mean(spacing))
         spacing = np.array(spacing)
-        is0 = KernelDensityFunctionIntegrator(
-            spacing, FreedmanDiaconis(spacing), plot=False
-        )
-        IS0.append(is0)
 
         if plotto:
+            # plot of the spacing distribution for each bin (plotto = False)
             spacing = np.array(spacing)
             plot = np.linspace(min(spacing), max(spacing), len(spacing))
             Poisson = distribution(spacing, "Poisson")
@@ -117,18 +209,48 @@ def spacingCalculus(bins):
             plt.ylabel("P(s)")
             plt.show()
 
-    # here I plot the mean spacing for each bin (validation for unfolding: <s> = 1)
+    xlinspace = np.linspace(
+        mindec, maxdec, len(Is0)
+    )  # linspace between the min and max of the spectrum
+    # here I plot the mean spacing for each bin (validation for unfolding: <s> = 1), with errors
     plt.figure()
-    plt.scatter(
-        np.arange(1, len(mean_spacings) + 1, 1), mean_spacings, marker="+", color="blue"
+    plt.title(r"$\langle s \rangle$", fontsize=20)
+    plt.errorbar(
+        xlinspace,
+        mean_spacings,
+        yerr=np.array(errors_mean_spacings) / 2,
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        ecolor="b",
+        label="Data Points",
     )
+    plt.xlabel(r"$\lambda$")
+    plt.ylabel(r"$\langle s \rangle$")
     plt.axhline(y=1, color="r", linestyle="--")
     plt.show()
 
-    # here I plot the IS0 for each bin ma non va devo riscriverlo
+    # here I plot Is0 (with errors) and Is0 with kde (with the same errors):
+
     plt.figure()
-    plt.scatter(range(len(IS0)), IS0, marker="+", color="blue")
+    plt.title(r"$I_{s0}$", fontsize=20)
+    plt.errorbar(
+        xlinspace,
+        Is0,
+        yerr=np.array(errors_Is0) / 2,
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        ecolor="r",
+        label="Data Points",
+    )
+    # plt.errorbar(xlinspace, Is0_with_kde, yerr=errors_Is0, fmt="x", label="Data Points")
+    plt.legend()
+    plt.xlabel(r"$\lambda$")
+    plt.ylabel(r"$I_{s0}$")
     plt.show()
+
+    #
 
 
 def selectRangeandPlot():
@@ -166,5 +288,150 @@ def selectRangeandPlot():
     spacingCalculus(grouped_bins)
 
 
+def topological_charge(kind="confined"):
+    d, c, topodec, topoconf = loadtxt(topocool=True)
+
+    if kind == "confined":
+        topo = topoconf
+    elif kind == "deconfined":
+        topo = topodec
+    print(topo.shape)
+    # for i in range(len(topo[0, :])):
+    #     plt.figure()
+    #     plt.hist(topo[:, i], bins = FreedmanDiaconis(topo[:, i]),  label='deconfined', histtype='step', density=True)
+    #     plt.show()
+
+    plt.figure()
+    plt.scatter(topo[:, 2], topo[:, 1])
+    plt.show()
+
+
+def mean_eigenvalues(data):
+    data = data[:, ::2]
+    conf = len(data)
+    num_ev = len(data[0])
+    mean = np.zeros(num_ev)
+
+    for ev in range(num_ev):
+        summ = sum(data[:, ev])
+        mean[ev] = summ / conf
+
+    return mean
+
+
+def IPR_and_PR(kind="PR", phase="deconfined", calculate_errors=False):
+    # load the data (remember that IPR^(-1) \approx Ns^3*PR)
+    Nt = 22
+    Ns = 40  # questo devo chiederlo a Francesco D'Angelo
+    ev = 200
+    positive_ev = 100
+
+    (
+        d,
+        c,
+    ) = loadtxt(topocool=False)
+
+    configurations = len(d[:, 0])
+    # organize the data
+    if phase == "deconfined":
+        d = d
+    elif phase == "confined":
+        d = c
+    maxdec = np.amax(np.abs(d[:, 4:204]))
+    mindec = np.amin(np.abs(d[:, 4:204]))
+    print("maxdeconfined", maxdec)
+    print("mindeconfined", mindec)
+    mean_eigenvalues_dec = mean_eigenvalues(
+        np.abs(d[:, 4:204])
+    )  # here the mean on all configurations of all \lambda
+    ipr_dec = d[:, 204 : 22 * ev + 204]
+
+    new_deconfined = []
+
+    for conf in ipr_dec:
+        # here I take the IPR value only for positive eigenvalues
+        new_data = []
+        i = 0
+        while i < len(conf):
+            new_data.extend(conf[i : i + Nt])  # Take Nt elements
+            i += 2 * Nt  # Jump Nt elements
+        new_deconfined.append(new_data)
+
+    # -------------------------------calculate errors:----------------------------------------------
+    if calculate_errors:
+        # shape new_deconfined2 = (332, 100, 22)
+        new_deconfined2 = np.zeros((len(ipr_dec), positive_ev, Nt))
+        for c in range(len(new_deconfined)):
+            for e in range(positive_ev):
+                new_deconfined2[c][e][:] = new_deconfined[c][e * Nt : (e + 1) * Nt]
+
+        ipr_errors = []
+        for e in range(positive_ev):
+            print("calculate errors for eigenvalues #:", e)
+            errors_temp = []
+            for c in range(configurations):
+                for t in range(Nt):
+                    errors_temp.append(new_deconfined2[c][e][t])
+            errors_temp = np.array(errors_temp)
+            ipr_errors.append(errorAnalysis(None, errors_temp, kind=2))
+
+        ipr_errors = np.array(ipr_errors)
+        np.savetxt("ipr_errors.txt", ipr_errors)
+    # ------------------------------------------------------------------------------------------------
+
+    # mean over all eigenvalues for the same time slice, it should result in a total of 22 IPRs
+    new_deconfined = np.array(new_deconfined)
+    errors_ = np.loadtxt("ipr_errors.txt")
+
+    ipr_sum = np.zeros((len(new_deconfined), positive_ev))
+    # here I sum over all time slices for each \lam for each configuration
+
+    for i in range(len(ipr_dec)):
+        for j in range(positive_ev):
+            ipr_sum[i][j] = sum(new_deconfined[i][j * Nt : (j + 1) * Nt])
+
+    ipr_mean = np.zeros(positive_ev)
+
+    for e in range(positive_ev):
+        ipr_mean[e] = np.mean(ipr_sum[:, e])
+
+    pr_ipr = ipr_mean
+    tipo = "IPR"
+
+    if kind == "PR":
+        pr = 1 / ipr_mean
+        pr_ipr = pr
+        errors_ = errors_ / (
+            ipr_mean**2
+        )  ##error prop.è giusto???? qua non so, è da chiedere
+        tipo = "PR"
+
+    plt.figure()
+    plt.title(f"{tipo} " r" vs  $\lambda$ " f" for {phase} phase", fontsize=20)
+    # plt.scatter(mean_eigenvalues_dec, pr_ipr, marker="+", color="blue")
+    plt.errorbar(
+        mean_eigenvalues_dec,
+        pr_ipr,
+        yerr=np.array(errors_),
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        color="b",
+        ecolor="g",
+        label="IPR",
+    )
+    plt.xlabel(r"$\lambda$", fontsize=15)
+    plt.ylabel(r"$\langle$" f"{tipo}" r"$ \rangle$", fontsize=15)
+    plt.show()
+
+
+def fake_ensembles():
+    dec, conf = loadtxt(topocool=False)
+    pass
+
+
 if __name__ == "__main__":
-    selectRangeandPlot()
+    # selectRangeandPlot()
+    # topological_charge()
+    IPR_and_PR()
+    pass

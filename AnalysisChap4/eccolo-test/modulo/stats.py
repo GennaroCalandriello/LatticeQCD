@@ -1,13 +1,85 @@
+from os import error
 import numpy as np
 import math
 import matplotlib.pyplot as plt
 import scipy.stats as stats
+import statistics
+from numba import njit, float64
+import multiprocessing
+from functools import partial
 
 from sklearn.neighbors import KernelDensity
 from scipy.ndimage import gaussian_filter
 from scipy.interpolate import CubicSpline, BSpline, splev, splrep, UnivariateSpline
 from scipy.integrate import quad
 from sklearn.mixture import GaussianMixture
+
+s_0 = 0.508
+
+
+@njit(float64[:](float64[:], float64), fastmath=True)
+def ricampionamento(array_osservabile, bin):
+    sample = []
+    for _ in range(round(len(array_osservabile) / bin)):
+        ii = np.random.randint(0, len(array_osservabile))
+        sample.extend(array_osservabile[ii : min(ii + bin, len(array_osservabile))])
+
+    return np.array(sample)
+
+
+def compute_Is0(num_ev, spacing):
+
+    less_than_s_0 = 0
+
+    for s in spacing:
+        if s < s_0:
+            less_than_s_0 += 1
+    Is_0 = less_than_s_0 / num_ev
+
+    return Is_0
+
+
+def bootstrap_(array_osservabile, num_ev, kind, bin):
+
+    """This function calculate the error of the observable, it is specific for the Is0 observable.
+    kind = 1 for Is0, kind = 2 for mean spacing"""
+    mean_array = []
+
+    for _ in range(100):
+
+        sample = ricampionamento(array_osservabile, bin)
+        if kind == 1:
+            mean_array.append(
+                compute_Is0(num_ev, sample)
+            )  # here I define the observable for Is0
+
+        elif kind == 2:
+            mean_array.append(
+                np.mean(sample)
+            )  # here I define the observable for the mean spacing
+
+    sigma = statistics.stdev(mean_array)
+    return sigma
+
+
+def errorAnalysis(
+    num_ev, array, kind
+):  # num_eigenvalues is necessary to calculate the Is0 for each resampling
+    """This function calculate the error of the observable array using the bootstrap method"""
+
+    print("Calculating error...")
+    # binning
+    length = len(array)
+    minexp = 1
+    maxexp = np.log2(length)
+    bins = [int(2**exp) for exp in np.linspace(minexp, maxexp, 11)]
+    bins = bins[:-1]
+
+    with multiprocessing.Pool(processes=len(bins)) as pool:
+        temp = partial(bootstrap_, array, num_ev, kind)
+        sigmi = pool.map(temp, bins)
+
+    return max(sigmi)
 
 
 def Sturge(data):
@@ -45,7 +117,7 @@ def b_spline(x, par):
     return splev(x, par)
 
 
-def KernelDensityFunctionIntegrator(data, num_bins, plot=True):
+def KernelDensityFunctionIntegrator(data, num_bins, plot=False):
 
     hist, bin_edge = np.histogram(data, bins=num_bins)
     bin_centers = 0.5 * (bin_edge[:-1] + bin_edge[1:])
@@ -263,3 +335,7 @@ def distribution(sp, kind):
             )
 
     return p
+
+
+if __name__ == "__main__":
+    pass

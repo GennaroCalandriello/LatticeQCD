@@ -3,7 +3,23 @@ import math
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 
+s_0 = 0.508
+num_bins = 20
+
+
 degrees = 3  # must be 1<= k <=5
+
+
+def compute_Is0(num_ev, spacing):
+
+    less_than_s_0 = 0
+
+    for s in spacing:
+        if s < s_0:
+            less_than_s_0 += 1
+    Is_0 = less_than_s_0 / num_ev
+
+    return Is_0
 
 
 def get_key(x):
@@ -46,7 +62,7 @@ def spacing_evaluation(ranked_ev):
     spacing = []
     for j in range(N_conf + 1):
         temp = []
-        spac=[]
+        spac = []
 
         for i in range(len(ranked_ev)):
             if ranked_ev[i, 1] == j:
@@ -76,7 +92,7 @@ def spacing_(ranked_ev):
         spacings.append(ranked_ordered[s, 0])
 
     spacings = np.diff((spacings))
-    spacings=np.abs(spacings)
+    spacings = np.abs(spacings)
     spacings = spacings / (np.mean(spacings) * N_conf)
 
     # spacings = spacings / np.mean((spacings))
@@ -243,13 +259,13 @@ def distribution(sp, kind):
 
     if kind == "GUE":
         for i in range(len(p)):
-            p[i] = (32 / np.pi ** 2) * s[i] ** 2 * np.exp(-4 / np.pi * s[i] ** 2)
+            p[i] = (32 / np.pi**2) * s[i] ** 2 * np.exp(-4 / np.pi * s[i] ** 2)
 
     if kind == "GSE":
         for i in range(len(p)):
             p[i] = (
-                2 ** 18
-                / (3 ** 6 * np.pi ** 3)
+                2**18
+                / (3**6 * np.pi**3)
                 * s[i] ** 4
                 * np.exp(-(64 / (9 * np.pi)) * s[i] ** 2)
             )
