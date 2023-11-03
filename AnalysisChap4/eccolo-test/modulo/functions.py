@@ -3,8 +3,12 @@ import math
 import matplotlib.pyplot as plt
 import scipy.stats as stats
 
+from modulo.stats import FreedmanDiaconis
+
 s_0 = 0.508
-num_bins = 20
+fakevec = np.linspace(0, 1, 33200)
+print("The correct number of bins should be:", FreedmanDiaconis(fakevec))
+num_bins = FreedmanDiaconis(fakevec)
 
 
 degrees = 3  # must be 1<= k <=5
@@ -15,7 +19,7 @@ def compute_Is0(num_ev, spacing):
     less_than_s_0 = 0
 
     for s in spacing:
-        if s < s_0:
+        if s <= s_0:
             less_than_s_0 += 1
     Is_0 = less_than_s_0 / num_ev
 

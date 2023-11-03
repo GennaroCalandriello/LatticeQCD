@@ -42,7 +42,7 @@ def compute_Is0(num_ev, spacing):
 def bootstrap_(array_osservabile, num_ev, kind, bin):
 
     """This function calculate the error of the observable, it is specific for the Is0 observable.
-    kind = 1 for Is0, kind = 2 for mean spacing"""
+    kind = 1 for Is0, kind = 2 for KDE evaluation errors, kind = 3 for simple mean"""
     mean_array = []
 
     for _ in range(100):
@@ -55,8 +55,10 @@ def bootstrap_(array_osservabile, num_ev, kind, bin):
 
         elif kind == 2:
             mean_array.append(
-                np.mean(sample)
+                KernelDensityFunctionIntegrator(sample, FreedmanDiaconis(sample))
             )  # here I define the observable for the mean spacing
+        elif kind == 3:
+            mean_array.append(np.mean(sample))
 
     sigma = statistics.stdev(mean_array)
     return sigma
@@ -89,7 +91,7 @@ def Sturge(data):
 
 def PDF(spacing):
 
-    bin_edges = np.linspace(min(spacing), max(spacing), Sturge(spacing))
+    bin_edges = np.linspace(min(spacing), max(spacing), 3 * FreedmanDiaconis(spacing))
     hist, _ = np.histogram(spacing, bin_edges)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) * 0.5
     bin_width = bin_edges[1] - bin_edges[0]
@@ -102,13 +104,16 @@ def CDF(data):
     """Calculate the Cumulative Density function of a set of data points,
     in this case data is the ULS"""
 
-    a, b = 0, 0.5
+    a, b = min(data), max(data)
     spectral_density, bin_edges, bin_centers, bin_width = PDF(data)
-    par = splrep(bin_centers, spectral_density, k=3)
+    par = splrep(bin_centers, spectral_density, k=5)
     x = np.linspace(bin_centers[0], bin_centers[-1], len(data))
 
     integral, _ = quad(b_spline, a, b, args=(par,))
     print("The CDF is: ", integral)
+    # plot the integral
+    plt.plot(x, b_spline(x, par))
+    plt.show()
 
     return integral
 
@@ -139,11 +144,11 @@ def KernelDensityFunctionIntegrator(data, num_bins, plot=False):
         plt.legend(loc="upper left")
         plt.show()
 
-    lower_bound = 0.0
+    lower_bound = min(data)
     upper_bound = 0.508
     integral_range = np.linspace(lower_bound, upper_bound, len(data))
     integral_kde = kde.integrate_box_1d(lower_bound, upper_bound)
-    print("the value of integral is: ", integral_kde)
+    # print("the value of integral is: ", integral_kde)
 
     return integral_kde
 

@@ -1,9 +1,9 @@
-from email import errors
-from hmac import new
 import numpy as np
 import multiprocessing
 from functools import partial
 from collections import defaultdict
+
+from pyparsing import col
 
 from modulo.functions import *
 from modulo.stats import *
@@ -14,7 +14,7 @@ def compute_Is0(num_ev, spacing):
     less_than_s_0 = 0
 
     for s in spacing:
-        if s < s_0:
+        if s <= s_0:
             less_than_s_0 += 1
     Is_0 = less_than_s_0 / num_ev
 
@@ -74,7 +74,7 @@ def loading():
     print("maxdeconfined", maxdec)
     print("maxconfined", maxconf)
 
-    return maxdec, mindec, maxconf, minconf
+    return econfined, edeconfined, maxdec, mindec, maxconf, minconf
 
 
 def loadSortRank():
@@ -128,7 +128,7 @@ def loadSortRank():
     return ranked_dec, ranked_conf, configurations
 
 
-def spacingCalculus(bins, plotto=False):
+def spacingCalculus(bins, plotto=False, errorCalculus=False):
 
     """This function calculate the spacing distribution for each bin.
     It takes bins in input structured as follows:
@@ -140,8 +140,10 @@ def spacingCalculus(bins, plotto=False):
     Is0 = []
     Is0_with_kde = []
     errors_Is0 = []
+    errors_Is0_with_kde = []
     errors_mean_spacings = []
-    maxdec, mindec, maxconf, minconf = loading()
+    mean_eigenvalues = []
+    _, _, maxdec, mindec, maxconf, minconf = loading()
 
     # qui ci sono tutti i bins
     for b in range(len(bins) - 1):
@@ -149,6 +151,7 @@ def spacingCalculus(bins, plotto=False):
         bin = bins[b]
         bin_next = bins[b + 1]
         count_ev_in_bin = 0
+        eigenvalueList = []
         for config, ranked_ev in bin.items():
 
             if (
@@ -168,7 +171,8 @@ def spacingCalculus(bins, plotto=False):
             for e in range(len(ranked_ev) - 1):
                 count_ev_in_bin += 1
                 spacing.append(((ranked_ev[e + 1][0] - ranked_ev[e][0])))
-
+                eigenvalueList.append(ranked_ev[e][1])
+            count_ev_in_bin += 1
             spacing.append(added_s)
 
         # spacing for each bin in which the spectrum is divided
@@ -176,8 +180,15 @@ def spacingCalculus(bins, plotto=False):
 
         # here I calculate the error on Is0 and on the mean spacing
         # kind= 1 for Is0, kind=2 for mean spacing
-        errors_Is0.append(errorAnalysis(count_ev_in_bin, spacing, kind=1))
-        errors_mean_spacings.append(errorAnalysis(count_ev_in_bin, spacing, kind=2))
+        if errorCalculus:
+            errors_Is0.append(errorAnalysis(count_ev_in_bin, spacing, kind=1))
+            errors_mean_spacings.append(errorAnalysis(count_ev_in_bin, spacing, kind=3))
+            # errors_Is0.append(0)
+            # errors_mean_spacings.append(0)
+            errors_Is0_with_kde.append(errorAnalysis(count_ev_in_bin, spacing, kind=2))
+        else:
+            errors_Is0.append(0)
+            errors_mean_spacings.append(0)
 
         # here I calculate Is0 and Is0 with kde
         Is0.append(compute_Is0(count_ev_in_bin, spacing))
@@ -188,6 +199,8 @@ def spacingCalculus(bins, plotto=False):
         # print("mean spacing", np.mean(spacing))
         mean_spacings.append(np.mean(spacing))
         spacing = np.array(spacing)
+        eigenvalueList = np.array(eigenvalueList)
+        mean_eigenvalues.append(np.mean(eigenvalueList))
 
         if plotto:
             # plot of the spacing distribution for each bin (plotto = False)
@@ -201,12 +214,19 @@ def spacingCalculus(bins, plotto=False):
                 bins=FreedmanDiaconis(spacing),
                 density=True,
                 histtype="step",
+                label=r"$\lambda \in$"
+                f"{round(min(eigenvalueList), 4)}; {round(max(eigenvalueList), 4)}",
+                color="blue",
             )
-            plt.legend()
-            plt.plot(plot, Poisson, "g--")
-            plt.plot(plot, GUE, "r--")
+
+            plt.plot(plot, Poisson, "g--", label="Poisson")
+            plt.plot(plot, GUE, "r--", label="GUE")
             plt.xlabel("s")
+            plt.xlim(0, 5.5)
             plt.ylabel("P(s)")
+            plt.grid(True)
+            plt.tight_layout()
+            plt.legend()
             plt.show()
 
     xlinspace = np.linspace(
@@ -218,16 +238,18 @@ def spacingCalculus(bins, plotto=False):
     plt.errorbar(
         xlinspace,
         mean_spacings,
-        yerr=np.array(errors_mean_spacings) / 2,
+        yerr=np.array(errors_mean_spacings),
         fmt="x",
         barsabove=True,
         capsize=5,
-        ecolor="b",
-        label="Data Points",
+        ecolor="r",
     )
     plt.xlabel(r"$\lambda$")
     plt.ylabel(r"$\langle s \rangle$")
-    plt.axhline(y=1, color="r", linestyle="--")
+    plt.axhline(y=1, color="g", linestyle="--")
+    plt.tight_layout()
+    plt.grid(True)
+
     plt.show()
 
     # here I plot Is0 (with errors) and Is0 with kde (with the same errors):
@@ -235,20 +257,39 @@ def spacingCalculus(bins, plotto=False):
     plt.figure()
     plt.title(r"$I_{s0}$", fontsize=20)
     plt.errorbar(
-        xlinspace,
+        mean_eigenvalues,
         Is0,
         yerr=np.array(errors_Is0) / 2,
         fmt="x",
         barsabove=True,
         capsize=5,
         ecolor="r",
-        label="Data Points",
     )
     # plt.errorbar(xlinspace, Is0_with_kde, yerr=errors_Is0, fmt="x", label="Data Points")
+    plt.axhline(y=0.117, color="r", linestyle="--")
+    plt.axhline(y=0.398, color="y", linestyle="--")
+    plt.text(0.02, 0.398, "Poisson", verticalalignment="bottom", color="gray")
+    plt.text(0.047, 0.117, "RMT", verticalalignment="bottom", color="orange")
     plt.legend()
     plt.xlabel(r"$\lambda$")
+    plt.tight_layout()
+    plt.grid(True)
     plt.ylabel(r"$I_{s0}$")
     plt.show()
+
+    # save the data---------------------------------------------------------------------------
+    np.savetxt("data_analysis/data/Is0.txt", Is0)
+    np.savetxt("data_analysis/data/mean_spacings.txt", mean_spacings)
+
+    if errorCalculus:
+        np.savetxt(
+            "data_analysis/errors/mean_spacings_errors.txt", errors_mean_spacings
+        )
+        np.savetxt("data_analysis/errors/Is0_errors.txt", errors_Is0)
+        np.savetxt("data_analysis/errors/Is0_with_kde_errors.txt", errors_Is0_with_kde)
+
+    np.savetxt("data_analysis/data/mean_eigenvalues.txt", mean_eigenvalues)
+    np.savetxt("data_analysis/data/Is0_with_kde.txt", Is0_with_kde)
 
     #
 
@@ -288,22 +329,42 @@ def selectRangeandPlot():
     spacingCalculus(grouped_bins)
 
 
-def topological_charge(kind="confined"):
+def topological_charge(kind="deconfined"):
     d, c, topodec, topoconf = loadtxt(topocool=True)
 
+    # caso deconfinato: sono 16 cariche topologiche per ogni configurazione (5312/332 = 16)
     if kind == "confined":
         topo = topoconf
     elif kind == "deconfined":
         topo = topodec
     print(topo.shape)
-    # for i in range(len(topo[0, :])):
-    #     plt.figure()
-    #     plt.hist(topo[:, i], bins = FreedmanDiaconis(topo[:, i]),  label='deconfined', histtype='step', density=True)
-    #     plt.show()
+    topotot = []
+    print(len(topo[:, 2]))
+    averages = []
+    _ = CDF(topo[:, 2])
+
+    for i in range(0, len(topo[:, 2])):
+        avg = round(topo[i, 2])
+        averages.append(avg)
+    averages = np.array(averages)
 
     plt.figure()
-    plt.scatter(topo[:, 2], topo[:, 1])
+    plt.xlabel("Q")
+    plt.ylabel("P(Q)")
+    plt.hist(
+        topo[:, 2],
+        bins=5 * FreedmanDiaconis(topo[:, 2]),
+        label="deconfined",
+        histtype="step",
+    )
+    plt.legend()
     plt.show()
+
+    plt.figure()
+    plt.plot(range(len(topo[:32, 0])), topo[:32, 1], "x")
+    plt.show()
+    chi = np.mean(topo[:, 2] ** 2) / (36**3 * 22)
+    print("chi", chi ** (1 / 4))
 
 
 def mean_eigenvalues(data):
@@ -319,7 +380,7 @@ def mean_eigenvalues(data):
     return mean
 
 
-def IPR_and_PR(kind="PR", phase="deconfined", calculate_errors=False):
+def IPR_and_PR(kind="IPR", phase="deconfined", calculate_errors=False):
     # load the data (remember that IPR^(-1) \approx Ns^3*PR)
     Nt = 22
     Ns = 40  # questo devo chiederlo a Francesco D'Angelo
@@ -339,8 +400,7 @@ def IPR_and_PR(kind="PR", phase="deconfined", calculate_errors=False):
         d = c
     maxdec = np.amax(np.abs(d[:, 4:204]))
     mindec = np.amin(np.abs(d[:, 4:204]))
-    print("maxdeconfined", maxdec)
-    print("mindeconfined", mindec)
+
     mean_eigenvalues_dec = mean_eigenvalues(
         np.abs(d[:, 4:204])
     )  # here the mean on all configurations of all \lambda
@@ -373,15 +433,16 @@ def IPR_and_PR(kind="PR", phase="deconfined", calculate_errors=False):
                 for t in range(Nt):
                     errors_temp.append(new_deconfined2[c][e][t])
             errors_temp = np.array(errors_temp)
-            ipr_errors.append(errorAnalysis(None, errors_temp, kind=2))
+            ipr_errors.append(errorAnalysis(None, errors_temp, kind=3))
 
         ipr_errors = np.array(ipr_errors)
-        np.savetxt("ipr_errors.txt", ipr_errors)
+        np.savetxt(f"data_analysis/errors/ipr_errors_{phase}.txt", ipr_errors)
+
     # ------------------------------------------------------------------------------------------------
 
     # mean over all eigenvalues for the same time slice, it should result in a total of 22 IPRs
     new_deconfined = np.array(new_deconfined)
-    errors_ = np.loadtxt("ipr_errors.txt")
+    errors_ = np.loadtxt("data_analysis/errors/ipr_errors_confined.txt")
 
     ipr_sum = np.zeros((len(new_deconfined), positive_ev))
     # here I sum over all time slices for each \lam for each configuration
@@ -406,6 +467,8 @@ def IPR_and_PR(kind="PR", phase="deconfined", calculate_errors=False):
         )  ##error prop.è giusto???? qua non so, è da chiedere
         tipo = "PR"
 
+    np.savetxt(f"data_analysis/data/{kind}_{phase}.txt", pr_ipr)
+
     plt.figure()
     plt.title(f"{tipo} " r" vs  $\lambda$ " f" for {phase} phase", fontsize=20)
     # plt.scatter(mean_eigenvalues_dec, pr_ipr, marker="+", color="blue")
@@ -422,6 +485,8 @@ def IPR_and_PR(kind="PR", phase="deconfined", calculate_errors=False):
     )
     plt.xlabel(r"$\lambda$", fontsize=15)
     plt.ylabel(r"$\langle$" f"{tipo}" r"$ \rangle$", fontsize=15)
+    plt.tight_layout()
+    plt.grid(True)
     plt.show()
 
 
@@ -430,8 +495,76 @@ def fake_ensembles():
     pass
 
 
+def SpatialExt():
+    """This function calculate the spatial extension of the eigenmodes.
+    references:
+    [1] Anderson Localization in Quark-Gluon Plasma - Kovacs, Pittler, equation (2)"""
+    pass
+
+
+def plotdata():
+
+    Is0 = np.loadtxt("data_analysis/data/Is0_with_kde.txt")
+    errors_Is0 = np.loadtxt("data_analysis/errors/Is0_errors.txt")
+    errors_Is0_with_kde = np.loadtxt("data_analysis/errors/Is0_with_kde_errors.txt")
+    mean_spacings = np.loadtxt("data_analysis/data/mean_spacings.txt")
+    mean_spacings_errors = np.loadtxt("data_analysis/errors/mean_spacings_errors.txt")
+    mean_eigenvalues = np.loadtxt("data_analysis/data/mean_eigenvalues.txt")
+
+    plt.figure()
+    plt.title(r"$I_{s_0}$ with KDE", fontsize=20)
+    plt.errorbar(
+        mean_eigenvalues,
+        Is0,
+        yerr=np.array(errors_Is0_with_kde),
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        ecolor="darkorange",
+        color="blue",
+    )
+    # plt.errorbar(xlinspace, Is0_with_kde, yerr=errors_Is0, fmt="x", label="Data Points")
+    plt.axhline(y=0.117, color="darkorchid", linestyle="--")
+    plt.axhline(y=0.398, color="plum", linestyle="--")
+    plt.text(0.02, 0.398, "Poisson", verticalalignment="bottom", color="darkorchid")
+    plt.text(0.005, 0.117, "RMT", verticalalignment="bottom", color="plum")
+    plt.legend()
+    plt.xlabel(r"$\lambda$", fontsize=15)
+    plt.tight_layout()
+    plt.grid(True)
+    plt.ylabel(r"$I_{s0}$", fontsize=15)
+    plt.show()
+
+    plt.figure()
+    plt.title("Mean spacings", fontsize=20)
+    plt.errorbar(
+        mean_eigenvalues,
+        mean_spacings,
+        yerr=np.array(mean_spacings_errors),
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        ecolor="darkorange",
+        color="blue",
+    )
+    plt.xlabel(r"$\lambda$", fontsize=15)
+    plt.ylabel(r"$\langle s \rangle$", fontsize=15)
+    plt.axhline(y=1, color="g", linestyle="--")
+    plt.tight_layout()
+    plt.grid(True)
+
+    plt.show()
+
+
+def lambda_edge():
+    """reference: https://arxiv.org/pdf/1706.03562.pdf"""
+    pass
+
+
 if __name__ == "__main__":
-    # selectRangeandPlot()
+    selectRangeandPlot()
     # topological_charge()
-    IPR_and_PR()
+    # IPR_and_PR()
+    # plotdata()
+    # lambda_edge()
     pass
