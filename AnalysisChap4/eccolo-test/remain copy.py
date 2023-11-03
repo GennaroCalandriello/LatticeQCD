@@ -3,10 +3,21 @@ import multiprocessing
 from functools import partial
 from collections import defaultdict
 
-from pyparsing import col
-
 from modulo.functions import *
 from modulo.stats import *
+
+path1 = "data_analysis/"
+pathData = f"data_analysis/{phase}/data/"
+pathErrors = f"data_analysis/{phase}/errors/"
+
+
+def make_dirs():
+
+    if os.path.exists(path1):
+        shutil.rmtree(path1)
+
+    os.makedirs(f"{pathData}")
+    os.makedirs(f"{pathErrors}")
 
 
 def compute_Is0(num_ev, spacing):
@@ -128,13 +139,11 @@ def loadSortRank():
     return ranked_dec, ranked_conf, configurations
 
 
-def spacingCalculus(bins, plotto=False, errorCalculus=False):
+def spacingCalculus(bins):
 
     """This function calculate the spacing distribution for each bin.
     It takes bins in input structured as follows:
     bins = [config_x: [ranked_ev, real_ev], config_y: [ranked_ev, real_ev], ...]"""
-
-    # here I want the max and min on all configurations:
 
     mean_spacings = []
     Is0 = []
@@ -154,41 +163,50 @@ def spacingCalculus(bins, plotto=False, errorCalculus=False):
         eigenvalueList = []
         for config, ranked_ev in bin.items():
 
-            if (
-                config in bin_next
-                and len(bin_next[config]) > 0
-                and len(bin[config]) > 0
-            ):
-                last_value = bin[config][-1][
-                    0
-                ]  # ok the structure is: bin[config][ranked][real_lambda]
-                first_value_next = bin_next[config][0][0]
-                added_s = first_value_next - last_value
+            # --------here I add the first spacing of the next bin to the previous one to minimize the partition of the spectrum in bins----------
+            # if (
+            #     config in bin_next
+            #     and len(bin_next[config]) > 0
+            #     and len(bin[config]) > 0
+            # ):
+            #     last_value = bin[config][-1][
+            #         0
+            #     ]  # ok the structure is: bin[config][ranked][real_lambda]
+            #     first_value_next = bin_next[config][0][0]
+            #     added_s = first_value_next - last_value
 
-            else:
-                added_s = 0
+            # else:
+            #     added_s = 0
+            # -------------------------------------------------------------------------------------------------------------------------------------
 
             for e in range(len(ranked_ev) - 1):
                 count_ev_in_bin += 1
                 spacing.append(((ranked_ev[e + 1][0] - ranked_ev[e][0])))
                 eigenvalueList.append(ranked_ev[e][1])
             count_ev_in_bin += 1
-            spacing.append(added_s)
+            # spacing.append(added_s)
 
         # spacing for each bin in which the spectrum is divided
         spacing = np.array(spacing)
+        eigenvalueList = np.array(eigenvalueList)
+
+        # SAVE spacings for histogram plot-------------------------------------------------------
+        np.savetxt(
+            f"{pathData}/spacings_{round(min(eigenvalueList), 4)}-{round(max(eigenvalueList), 4)}.txt",
+            spacing,
+        )
+        # -------------------------------------------------------------------------------------
 
         # here I calculate the error on Is0 and on the mean spacing
         # kind= 1 for Is0, kind=2 for mean spacing
-        if errorCalculus:
+        if calculate_errors:
             errors_Is0.append(errorAnalysis(count_ev_in_bin, spacing, kind=1))
             errors_mean_spacings.append(errorAnalysis(count_ev_in_bin, spacing, kind=3))
-            # errors_Is0.append(0)
-            # errors_mean_spacings.append(0)
             errors_Is0_with_kde.append(errorAnalysis(count_ev_in_bin, spacing, kind=2))
         else:
             errors_Is0.append(0)
             errors_mean_spacings.append(0)
+            errors_Is0_with_kde.append(0)
 
         # here I calculate Is0 and Is0 with kde
         Is0.append(compute_Is0(count_ev_in_bin, spacing))
@@ -202,113 +220,41 @@ def spacingCalculus(bins, plotto=False, errorCalculus=False):
         eigenvalueList = np.array(eigenvalueList)
         mean_eigenvalues.append(np.mean(eigenvalueList))
 
-        if plotto:
-            # plot of the spacing distribution for each bin (plotto = False)
-            spacing = np.array(spacing)
-            plot = np.linspace(min(spacing), max(spacing), len(spacing))
-            Poisson = distribution(spacing, "Poisson")
-            GUE = distribution(plot, "GUE")
-            plt.figure()
-            plt.hist(
-                spacing,
-                bins=FreedmanDiaconis(spacing),
-                density=True,
-                histtype="step",
-                label=r"$\lambda \in$"
-                f"{round(min(eigenvalueList), 4)}; {round(max(eigenvalueList), 4)}",
-                color="blue",
-            )
-
-            plt.plot(plot, Poisson, "g--", label="Poisson")
-            plt.plot(plot, GUE, "r--", label="GUE")
-            plt.xlabel("s")
-            plt.xlim(0, 5.5)
-            plt.ylabel("P(s)")
-            plt.grid(True)
-            plt.tight_layout()
-            plt.legend()
-            plt.show()
-
-    xlinspace = np.linspace(
-        mindec, maxdec, len(Is0)
-    )  # linspace between the min and max of the spectrum
-    # here I plot the mean spacing for each bin (validation for unfolding: <s> = 1), with errors
-    plt.figure()
-    plt.title(r"$\langle s \rangle$", fontsize=20)
-    plt.errorbar(
-        xlinspace,
-        mean_spacings,
-        yerr=np.array(errors_mean_spacings),
-        fmt="x",
-        barsabove=True,
-        capsize=5,
-        ecolor="r",
-    )
-    plt.xlabel(r"$\lambda$")
-    plt.ylabel(r"$\langle s \rangle$")
-    plt.axhline(y=1, color="g", linestyle="--")
-    plt.tight_layout()
-    plt.grid(True)
-
-    plt.show()
-
-    # here I plot Is0 (with errors) and Is0 with kde (with the same errors):
-
-    plt.figure()
-    plt.title(r"$I_{s0}$", fontsize=20)
-    plt.errorbar(
-        mean_eigenvalues,
-        Is0,
-        yerr=np.array(errors_Is0) / 2,
-        fmt="x",
-        barsabove=True,
-        capsize=5,
-        ecolor="r",
-    )
-    # plt.errorbar(xlinspace, Is0_with_kde, yerr=errors_Is0, fmt="x", label="Data Points")
-    plt.axhline(y=0.117, color="r", linestyle="--")
-    plt.axhline(y=0.398, color="y", linestyle="--")
-    plt.text(0.02, 0.398, "Poisson", verticalalignment="bottom", color="gray")
-    plt.text(0.047, 0.117, "RMT", verticalalignment="bottom", color="orange")
-    plt.legend()
-    plt.xlabel(r"$\lambda$")
-    plt.tight_layout()
-    plt.grid(True)
-    plt.ylabel(r"$I_{s0}$")
-    plt.show()
-
     # save the data---------------------------------------------------------------------------
-    np.savetxt("data_analysis/data/Is0.txt", Is0)
-    np.savetxt("data_analysis/data/mean_spacings.txt", mean_spacings)
+    np.savetxt(f"{pathData}/Is0.txt", Is0)
+    np.savetxt(f"{pathData}/mean_spacings.txt", mean_spacings)
 
-    if errorCalculus:
-        np.savetxt(
-            "data_analysis/errors/mean_spacings_errors.txt", errors_mean_spacings
-        )
-        np.savetxt("data_analysis/errors/Is0_errors.txt", errors_Is0)
-        np.savetxt("data_analysis/errors/Is0_with_kde_errors.txt", errors_Is0_with_kde)
+    if calculate_errors:
+        np.savetxt(f"{pathErrors}/mean_spacings_errors.txt", errors_mean_spacings)
+        np.savetxt(f"{pathErrors}/Is0_errors.txt", errors_Is0)
+        np.savetxt(f"{pathErrors}/Is0_with_kde_errors.txt", errors_Is0_with_kde)
 
-    np.savetxt("data_analysis/data/mean_eigenvalues.txt", mean_eigenvalues)
-    np.savetxt("data_analysis/data/Is0_with_kde.txt", Is0_with_kde)
-
-    #
+    np.savetxt(f"{pathData}/mean_eigenvalues.txt", mean_eigenvalues)
+    np.savetxt(f"{pathData}/Is0_with_kde.txt", Is0_with_kde)
 
 
-def selectRangeandPlot():
+def spectralRegionsAnalysis():
 
     """Qui seleziono un certo range e calcolo la differenza s(i,j)= x(i,j+1) - x(i,j)
     reference: Localization properties of Dirac modes at the Roberge-Weiss phase transition, PHYS. REV. D 105, 014506 (2022)"""
 
+    print("Freedman-Diaconis number of bins: ", num_bins)
+
     # here in the ranked_dec I append: [configurazione, rango, lambda(i,j)]
     ranked_dec, ranked_conf, configurations = loadSortRank()
 
-    bin_size = len(ranked_dec) // num_bins
+    if phase == "deconfined":
+        ranked_ = ranked_dec
+    elif phase == "confined":
+        ranked_ = ranked_conf
+
+    bin_size = len(ranked_) // num_bins
     print("size", bin_size)
     bins = []
 
     # Split the spectrum in bins
-    for i in range(0, len(ranked_dec), bin_size):
-        bins.append(ranked_dec[i : i + bin_size])
+    for i in range(0, len(ranked_), bin_size):
+        bins.append(ranked_[i : i + bin_size])
 
     grouped_bins = []
 
@@ -380,10 +326,10 @@ def mean_eigenvalues(data):
     return mean
 
 
-def IPR_and_PR(kind="IPR", phase="deconfined", calculate_errors=False):
+def IPR_and_PR():
     # load the data (remember that IPR^(-1) \approx Ns^3*PR)
     Nt = 22
-    Ns = 40  # questo devo chiederlo a Francesco D'Angelo
+    Ns = 36  # questo devo chiederlo a Francesco D'Angelo
     ev = 200
     positive_ev = 100
 
@@ -401,29 +347,29 @@ def IPR_and_PR(kind="IPR", phase="deconfined", calculate_errors=False):
     maxdec = np.amax(np.abs(d[:, 4:204]))
     mindec = np.amin(np.abs(d[:, 4:204]))
 
-    mean_eigenvalues_dec = mean_eigenvalues(
+    mean_eigenvalues_ = mean_eigenvalues(
         np.abs(d[:, 4:204])
     )  # here the mean on all configurations of all \lambda
-    ipr_dec = d[:, 204 : 22 * ev + 204]
+    ipr_ = d[:, 204 : 22 * ev + 204]
 
-    new_deconfined = []
+    new_ipr = []
 
-    for conf in ipr_dec:
+    for conf in ipr_:
         # here I take the IPR value only for positive eigenvalues
         new_data = []
         i = 0
         while i < len(conf):
             new_data.extend(conf[i : i + Nt])  # Take Nt elements
             i += 2 * Nt  # Jump Nt elements
-        new_deconfined.append(new_data)
+        new_ipr.append(new_data)
 
     # -------------------------------calculate errors:----------------------------------------------
     if calculate_errors:
-        # shape new_deconfined2 = (332, 100, 22)
-        new_deconfined2 = np.zeros((len(ipr_dec), positive_ev, Nt))
-        for c in range(len(new_deconfined)):
+
+        new_ipr2 = np.zeros((len(ipr_), positive_ev, Nt))
+        for c in range(len(new_ipr)):
             for e in range(positive_ev):
-                new_deconfined2[c][e][:] = new_deconfined[c][e * Nt : (e + 1) * Nt]
+                new_ipr2[c][e][:] = new_ipr[c][e * Nt : (e + 1) * Nt]
 
         ipr_errors = []
         for e in range(positive_ev):
@@ -431,63 +377,46 @@ def IPR_and_PR(kind="IPR", phase="deconfined", calculate_errors=False):
             errors_temp = []
             for c in range(configurations):
                 for t in range(Nt):
-                    errors_temp.append(new_deconfined2[c][e][t])
+                    errors_temp.append(new_ipr2[c][e][t])
             errors_temp = np.array(errors_temp)
             ipr_errors.append(errorAnalysis(None, errors_temp, kind=3))
 
         ipr_errors = np.array(ipr_errors)
-        np.savetxt(f"data_analysis/errors/ipr_errors_{phase}.txt", ipr_errors)
 
+    else:
+        ipr_errors = np.zeros(100)
     # ------------------------------------------------------------------------------------------------
 
     # mean over all eigenvalues for the same time slice, it should result in a total of 22 IPRs
-    new_deconfined = np.array(new_deconfined)
-    errors_ = np.loadtxt("data_analysis/errors/ipr_errors_confined.txt")
+    new_ipr = np.array(new_ipr)
 
-    ipr_sum = np.zeros((len(new_deconfined), positive_ev))
+    ipr_sum = np.zeros((len(new_ipr), positive_ev))
     # here I sum over all time slices for each \lam for each configuration
 
-    for i in range(len(ipr_dec)):
+    for i in range(len(ipr_)):
         for j in range(positive_ev):
-            ipr_sum[i][j] = sum(new_deconfined[i][j * Nt : (j + 1) * Nt])
+            ipr_sum[i][j] = sum(new_ipr[i][j * Nt : (j + 1) * Nt])
 
     ipr_mean = np.zeros(positive_ev)
 
     for e in range(positive_ev):
         ipr_mean[e] = np.mean(ipr_sum[:, e])
 
-    pr_ipr = ipr_mean
-    tipo = "IPR"
+    ipr = ipr_mean
 
-    if kind == "PR":
-        pr = 1 / ipr_mean
-        pr_ipr = pr
-        errors_ = errors_ / (
-            ipr_mean**2
-        )  ##error prop.è giusto???? qua non so, è da chiedere
-        tipo = "PR"
+    pr = Volume / ipr
+    pr_errors = ipr_errors / (
+        ipr**2
+    )  ##error prop.è giusto???? qua non so, è da chiedere
 
-    np.savetxt(f"data_analysis/data/{kind}_{phase}.txt", pr_ipr)
+    # SAVE DATA
+    np.savetxt(f"{pathData}/ipr_{phase}.txt", ipr)
+    np.savetxt(f"{pathData}/pr_{phase}.txt", pr)
+    np.savetxt(f"{pathData}/mean_eigenvalues_{phase}.txt", mean_eigenvalues_)
 
-    plt.figure()
-    plt.title(f"{tipo} " r" vs  $\lambda$ " f" for {phase} phase", fontsize=20)
-    # plt.scatter(mean_eigenvalues_dec, pr_ipr, marker="+", color="blue")
-    plt.errorbar(
-        mean_eigenvalues_dec,
-        pr_ipr,
-        yerr=np.array(errors_),
-        fmt="x",
-        barsabove=True,
-        capsize=5,
-        color="b",
-        ecolor="g",
-        label="IPR",
-    )
-    plt.xlabel(r"$\lambda$", fontsize=15)
-    plt.ylabel(r"$\langle$" f"{tipo}" r"$ \rangle$", fontsize=15)
-    plt.tight_layout()
-    plt.grid(True)
-    plt.show()
+    if calculate_errors:
+        np.savetxt(f"{pathErrors}/ipr_errors_{phase}.txt", ipr_errors)
+        np.savetxt(f"{pathErrors}/pr_errors_{phase}.txt", pr_errors)
 
 
 def fake_ensembles():
@@ -504,26 +433,42 @@ def SpatialExt():
 
 def plotdata():
 
-    Is0 = np.loadtxt("data_analysis/data/Is0_with_kde.txt")
-    errors_Is0 = np.loadtxt("data_analysis/errors/Is0_errors.txt")
-    errors_Is0_with_kde = np.loadtxt("data_analysis/errors/Is0_with_kde_errors.txt")
-    mean_spacings = np.loadtxt("data_analysis/data/mean_spacings.txt")
-    mean_spacings_errors = np.loadtxt("data_analysis/errors/mean_spacings_errors.txt")
-    mean_eigenvalues = np.loadtxt("data_analysis/data/mean_eigenvalues.txt")
+    Is0_with_kde = np.loadtxt(f"{pathData}/Is0_with_kde.txt")
+    Is0 = np.loadtxt(f"{pathData}/Is0.txt")
+    mean_eigenvalues = np.loadtxt(f"{pathData}/mean_eigenvalues.txt")
+    mean_spacings = np.loadtxt(f"{pathData}/mean_spacings.txt")
+    IPR = np.loadtxt(f"{pathData}/ipr_{phase}.txt")
+    PR = np.loadtxt(f"{pathData}/pr_{phase}.txt")
+    mean_lambda_ipr = np.loadtxt(f"{pathData}/mean_eigenvalues_{phase}.txt")
 
+    if calculate_errors:
+        mean_spacings_errors = np.loadtxt(f"{pathErrors}/mean_spacings_errors.txt")
+        errors_Is0 = np.loadtxt(f"{pathErrors}/Is0_errors.txt")
+        errors_Is0_with_kde = np.loadtxt(f"{pathErrors}/Is0_with_kde_errors.txt")
+        ipr_errors = np.loadtxt(f"{pathErrors}/ipr_errors_{phase}.txt")
+        pr_errors = np.loadtxt(f"{pathErrors}/pr_errors_{phase}.txt")
+
+    else:
+        mean_spacings_errors = np.zeros(len(mean_spacings))
+        errors_Is0 = np.zeros(len(Is0))
+        errors_Is0_with_kde = np.zeros(len(Is0_with_kde))
+        ipr_errors = np.zeros(len(IPR))
+        pr_errors = np.zeros(len(PR))
+
+    # Is0 with KDE
     plt.figure()
     plt.title(r"$I_{s_0}$ with KDE", fontsize=20)
     plt.errorbar(
         mean_eigenvalues,
-        Is0,
-        yerr=np.array(errors_Is0_with_kde),
+        Is0_with_kde,
+        yerr=np.array(errors_Is0) / 2,
         fmt="x",
         barsabove=True,
         capsize=5,
         ecolor="darkorange",
         color="blue",
     )
-    # plt.errorbar(xlinspace, Is0_with_kde, yerr=errors_Is0, fmt="x", label="Data Points")
+
     plt.axhline(y=0.117, color="darkorchid", linestyle="--")
     plt.axhline(y=0.398, color="plum", linestyle="--")
     plt.text(0.02, 0.398, "Poisson", verticalalignment="bottom", color="darkorchid")
@@ -535,6 +480,32 @@ def plotdata():
     plt.ylabel(r"$I_{s0}$", fontsize=15)
     plt.show()
 
+    # Is0 without KDE
+    plt.figure()
+    plt.title(r"$I_{s_0}$", fontsize=20)
+    plt.errorbar(
+        mean_eigenvalues,
+        Is0,
+        yerr=np.array(errors_Is0) / 2,
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        ecolor="darkorange",
+        color="blue",
+    )
+    plt.axhline(y=0.117, color="darkorchid", linestyle="--")
+    plt.axhline(y=0.196, color="darkorchid", linestyle="--")
+    plt.axhline(y=0.398, color="plum", linestyle="--")
+    plt.text(0.02, 0.398, "Poisson", verticalalignment="bottom", color="darkorchid")
+    plt.text(0.005, 0.117, "RMT", verticalalignment="bottom", color="plum")
+    plt.legend()
+    plt.xlabel(r"$\lambda$", fontsize=15)
+    plt.tight_layout()
+    plt.grid(True)
+    plt.ylabel(r"$I_{s0}$", fontsize=15)
+    plt.show()
+
+    # Mean Spacing
     plt.figure()
     plt.title("Mean spacings", fontsize=20)
     plt.errorbar(
@@ -552,19 +523,182 @@ def plotdata():
     plt.axhline(y=1, color="g", linestyle="--")
     plt.tight_layout()
     plt.grid(True)
+    plt.show()
 
+    # IPR
+    plt.figure()
+    plt.title(r" IPR vs  $\lambda$ " f" for {phase} phase", fontsize=20)
+    # plt.scatter(mean_eigenvalues_dec, pr_ipr, marker="+", color="blue")
+    plt.errorbar(
+        mean_lambda_ipr,
+        IPR,
+        yerr=np.array(ipr_errors),
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        color="b",
+        ecolor="g",
+        label="IPR",
+    )
+    plt.xlabel(r"$\lambda$", fontsize=15)
+    plt.ylabel(r"$\langle$ IPR $ \rangle$", fontsize=15)
+    plt.tight_layout()
+    plt.grid(True)
+    plt.show()
+
+    # PR
+    plt.figure()
+    plt.title(r" PR vs  $\lambda$ " f" for {phase} phase", fontsize=20)
+    plt.errorbar(
+        mean_lambda_ipr,
+        PR,
+        yerr=np.array(pr_errors),
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        color="b",
+        ecolor="g",
+        label="IPR",
+    )
+    plt.xlabel(r"$\lambda$", fontsize=15)
+    plt.ylabel(r"$\langle$ PR $ \rangle$", fontsize=15)
+    plt.tight_layout()
+    plt.grid(True)
     plt.show()
 
 
-def lambda_edge():
+def lambda_edge_via_IPR():
     """reference: https://arxiv.org/pdf/1706.03562.pdf"""
-    pass
+
+    lambda_values = np.loadtxt(f"{pathData}/mean_eigenvalues_{phase}.txt")
+    pr_values = np.loadtxt(f"{pathData}/ipr_{phase}.txt")
+    ipr_err = np.loadtxt(f"{pathErrors}/ipr_errors_{phase}.txt")
+    # ipr_values = np.loadtxt(
+    #     f"{pathData}/ipr_{phase}.txt"
+    # )  # Fit data with a polynomial (change degree as needed)
+
+    coeff = np.polyfit(
+        lambda_values, pr_values, deg=10
+    )  # Using a 4th degree polynomial
+    polynomial = np.poly1d(coeff)
+
+    # Generate a dense grid of lambda values for plotting
+    dense_lambda = np.linspace(lambda_values[0], lambda_values[-1], 1000)
+    fitted_pr = polynomial(dense_lambda)
+
+    # Compute the second derivative of the polynomial
+    second_derivative = polynomial.deriv().deriv()
+
+    # Find the roots of the second derivative to determine inflection points
+    inflection_points = second_derivative.r
+    valid_inflection_points = [
+        point
+        for point in inflection_points
+        if point.imag == 0 and lambda_values[0] <= point.real <= lambda_values[-1]
+    ]
+    print("Inflection points (λ values):", valid_inflection_points)
+
+    plt.figure()
+    plt.title(r" IPR vs  $\lambda$ " f" for {phase} phase", fontsize=20)
+    # plt.scatter(mean_eigenvalues_dec, pr_ipr, marker="+", color="blue")
+    plt.errorbar(
+        lambda_values,
+        pr_values,
+        yerr=np.array(ipr_err),
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        color="b",
+        ecolor="g",
+        label="IPR",
+    )
+    plt.plot(dense_lambda, fitted_pr, color="red", label="Fitted Polynomial Curve")
+    plt.xlabel(r"$\lambda$", fontsize=15)
+    plt.ylabel(r"$\langle$ IPR $ \rangle$", fontsize=15)
+    plt.tight_layout()
+    plt.grid(True)
+    plt.show()
+
+
+def lambda_edge_via_Is0():
+
+    from scipy.optimize import curve_fit
+    from scipy.interpolate import CubicSpline
+
+    method = 1
+
+    Is0 = np.loadtxt(f"{pathData}/Is0.txt")
+    Is0_err = np.loadtxt(f"{pathErrors}/Is0_errors.txt")
+    lambda_values = np.loadtxt(f"{pathData}/mean_eigenvalues.txt")
+
+    # Find the closest point to Is0cr
+
+    # approx_lambda_c = lambda_values[np.abs(Is0 - Is0crit).argmin()]
+    # print("approximate lambda_c", approx_lambda_c)
+    # Find the closest point to Is0cr
+    if method == 1:
+        approx_lambda_c = lambda_values[np.abs(Is0 - Is0crit).argmin()]
+
+        # Consider points around approx_lambda_c for linear fit
+        window_size = 0.01  # Define window size
+        mask = (lambda_values > approx_lambda_c - window_size) & (
+            lambda_values < approx_lambda_c + window_size
+        )
+
+        # Linear fit function
+        def linear(x, a, b):
+            return a * x + b
+
+        popt, _ = curve_fit(linear, lambda_values[mask], Is0[mask])
+
+        # Find lambda_c where Is0(λ) = Is0cr
+        lambda_c = (Is0crit - popt[1]) / popt[0]
+
+        print("Determined lambda_c:", lambda_c)
+
+    if method == 2:
+        spline_p = Is0 + Is0_err / 2
+        spline_m = Is0 - Is0_err / 2
+
+        cubic_spline_p = CubicSpline(lambda_values, spline_p)
+        cubic_spline_m = CubicSpline(lambda_values, spline_m)
+
+        dense_lambda = np.linspace(lambda_values[0], lambda_values[-1], 1000)
+        fitted_Is0_p = cubic_spline_p(dense_lambda)
+        fitted_Is0_m = cubic_spline_m(dense_lambda)
+
+        plt.figure()
+        plt.title(r"$I_{s_0}$", fontsize=20)
+        plt.errorbar(
+            lambda_values,
+            Is0,
+            yerr=np.array(Is0_err) / 2,
+            fmt="x",
+            barsabove=False,
+            capsize=5,
+            ecolor="darkorange",
+            color="blue",
+        )
+        plt.plot(dense_lambda, fitted_Is0_p, color="red", label="Spline+")
+        plt.plot(dense_lambda, fitted_Is0_m, color="blue", label="Spline-")
+        plt.axhline(y=0.196, color="darkorchid", linestyle="--")
+
+        plt.text(0.02, 0.398, "Poisson", verticalalignment="bottom", color="darkorchid")
+        plt.text(0.005, 0.117, "RMT", verticalalignment="bottom", color="plum")
+        plt.legend()
+        plt.xlabel(r"$\lambda$", fontsize=15)
+        plt.tight_layout()
+        plt.grid(True)
+        plt.ylabel(r"$I_{s0}$", fontsize=15)
+        plt.show()
 
 
 if __name__ == "__main__":
-    selectRangeandPlot()
+    # make_dirs()
+    # spectralRegionsAnalysis()
     # topological_charge()
-    # IPR_and_PR()
-    # plotdata()
-    # lambda_edge()
+    IPR_and_PR()
+    plotdata()
+    # lambda_edge_via_IPR()
+    # lambda_edge_via_Is0()
     pass
