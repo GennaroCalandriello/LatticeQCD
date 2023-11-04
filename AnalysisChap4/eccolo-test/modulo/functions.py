@@ -180,67 +180,6 @@ def histogramFunction(sp, kind: str, bins, low, high):
     plt.show()
 
 
-def IPR(data, kind):
-
-    """Separate IPR from the other data and analyze it"""
-
-    N_conf = len(data[:])
-    Nt = 22  # time extension of the system
-    ev = 200
-    Nt_ev = Nt * ev
-
-    IPR_values = data[:, 204 : Nt_ev + 204]  # select only IPR from data
-    IPR_array = np.zeros((N_conf, 22 * 100))
-
-    for i in range(N_conf):
-
-        temp = []
-
-        for j in range(
-            0, Nt_ev, Nt * 2
-        ):  # here I jump the IPR associated with negative (coupled) eigenvalues
-            temp.extend(IPR_values[i, j : j + Nt])
-
-        IPR_array[
-            i
-        ] = temp  # array of 100 positive eigenvalues*22 time slices (each \lamb for 22 Nt)
-
-    IPR_sum = []
-
-    for i in range(
-        N_conf
-    ):  # here I sum over all time slices for each \lam for each configuration
-        for j in range(0, len(IPR_array[0]), Nt):
-            sommo = sum((IPR_array[i, j : j + Nt]))
-            IPR_sum.append(sommo)
-
-    IPR_final = np.array(reshape_to_matrix(np.array(IPR_sum)))
-    # for i in range(100):
-    #       ###equivalent to the list comprehension below
-    #     temp = []
-    #     for j in range(N_conf):
-    #         temp.append(IPR_final[j, i])
-    #     IPR_mean.append(np.mean(temp))
-
-    IPR_mean = [
-        np.mean([x for x in row]) for row in IPR_final.T
-    ]  # IPR mean for each \lambda along all conf
-
-    eigenvalues = np.abs(data[:, 4:204])  # select eigenvalues
-    eigenvalues = eigenvalues[:, ::2]  # eliminate chiral paired \lambda
-    mean = [
-        np.mean([x for x in row]) for row in eigenvalues.T
-    ]  # find <\lambda> along all paths
-    print("lunghezza ipr", len(IPR_mean))
-    plt.figure()
-    plt.title(r"IPR vs $\lambda$" f" for {kind} phase", fontsize=13)
-    plt.xlabel(r"$<\lambda>$", fontsize=15)
-    plt.ylabel("<IPR>", fontsize=15)
-    plt.scatter(mean, IPR_mean, s=8, c="b")
-    plt.legend()
-    plt.show()
-
-
 def reshape_to_matrix(array):
 
     shape = (round(len(array) / 100), 100)

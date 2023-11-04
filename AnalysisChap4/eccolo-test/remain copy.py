@@ -3,6 +3,7 @@ import multiprocessing
 from functools import partial
 from collections import defaultdict
 
+
 from modulo.functions import *
 from modulo.stats import *
 
@@ -13,8 +14,10 @@ pathErrors = f"data_analysis/{phase}/errors/"
 
 def make_dirs():
 
-    if os.path.exists(path1):
-        shutil.rmtree(path1)
+    if os.path.exists(pathData):
+        shutil.rmtree(pathData)
+    if os.path.exists(pathErrors):
+        shutil.rmtree(pathErrors)
 
     os.makedirs(f"{pathData}")
     os.makedirs(f"{pathErrors}")
@@ -101,7 +104,8 @@ def loadSortRank():
     # indicesRandom = np.random.choice(edeconfined.shape[0], 300, replace=False)
     # edeconfined = edeconfined[indicesRandom, :]
 
-    configurations = len(edeconfined[:, 0])
+    configurations_dec = len(edeconfined[:, 0])
+    configurations_conf = len(econfined[:, 0])
 
     # print max
     maxdec = np.amax(edeconfined)
@@ -121,6 +125,9 @@ def loadSortRank():
     for i in range(len(edeconfined[:, 0])):
         for j in range(len(edeconfined[0, :])):
             unsorted_dec.append([int(i + 1), edeconfined[i, j]])
+
+    for i in range(len(econfined[:, 0])):
+        for j in range(len(econfined[0, :])):
             unsorted_conf.append([int(i + 1), econfined[i, j]])
 
     sorted_dec = sorted(unsorted_dec, key=lambda x: x[1])
@@ -128,15 +135,21 @@ def loadSortRank():
 
     # rimpiazzo i lambda(i,j) con il loro rango r nell'insieme di tutti gli autovalori diviso
     # il numero di configurazioni
-    rank = np.arange(1, len(sorted_dec[:]) + 1, 1)
-    rank = rank / configurations
+    rank1 = np.arange(1, len(sorted_dec[:]) + 1, 1)
+    rank2 = np.arange(1, len(sorted_conf[:]) + 1, 1)
+    rank1 = rank1 / configurations_dec
+    rank2 = rank2 / configurations_conf
 
     # here in the ranked_dec I append: [configurazione, rango, lambda(i,j)]
-    for k in range(len(rank)):
-        ranked_dec.append([sorted_dec[k][0], rank[k], sorted_dec[k][1]])
-        ranked_conf.append([sorted_conf[k][0], rank[k], sorted_conf[k][1]])
+    for k in range(len(rank1)):
+        ranked_dec.append([sorted_dec[k][0], rank1[k], sorted_dec[k][1]])
 
-    return ranked_dec, ranked_conf, configurations
+    for k in range(len(rank2)):
+        ranked_conf.append([sorted_conf[k][0], rank2[k], sorted_conf[k][1]])
+
+    return ranked_dec, ranked_conf, configurations_dec, configurations_conf
+
+    pass
 
 
 def spacingCalculus(bins):
@@ -152,7 +165,6 @@ def spacingCalculus(bins):
     errors_Is0_with_kde = []
     errors_mean_spacings = []
     mean_eigenvalues = []
-    _, _, maxdec, mindec, maxconf, minconf = loading()
 
     # qui ci sono tutti i bins
     for b in range(len(bins) - 1):
@@ -163,28 +175,30 @@ def spacingCalculus(bins):
         eigenvalueList = []
         for config, ranked_ev in bin.items():
 
-            # --------here I add the first spacing of the next bin to the previous one to minimize the partition of the spectrum in bins----------
-            # if (
-            #     config in bin_next
-            #     and len(bin_next[config]) > 0
-            #     and len(bin[config]) > 0
-            # ):
-            #     last_value = bin[config][-1][
-            #         0
-            #     ]  # ok the structure is: bin[config][ranked][real_lambda]
-            #     first_value_next = bin_next[config][0][0]
-            #     added_s = first_value_next - last_value
+            # #--------here I add the first spacing of the next bin to the previous one to minimize the partition of the spectrum in bins----------
+            if (
+                config in bin_next
+                and len(bin_next[config]) > 0
+                and len(bin[config]) > 0
+            ):
+                last_value = bin[config][-1][
+                    0
+                ]  # ok the structure is: bin[config][ranked][real_lambda]
+                first_value_next = bin_next[config][0][0]
+                added_s = first_value_next - last_value
 
-            # else:
-            #     added_s = 0
-            # -------------------------------------------------------------------------------------------------------------------------------------
+            else:
+                added_s = 0
+            # # -------------------------------------------------------------------------------------------------------------------------------------
 
             for e in range(len(ranked_ev) - 1):
-                count_ev_in_bin += 1
                 spacing.append(((ranked_ev[e + 1][0] - ranked_ev[e][0])))
+
+            for e in range(len(ranked_ev)):
+                count_ev_in_bin += 1
                 eigenvalueList.append(ranked_ev[e][1])
-            count_ev_in_bin += 1
-            # spacing.append(added_s)
+
+            spacing.append(added_s)
 
         # spacing for each bin in which the spectrum is divided
         spacing = np.array(spacing)
@@ -241,12 +255,14 @@ def spectralRegionsAnalysis():
     print("Freedman-Diaconis number of bins: ", num_bins)
 
     # here in the ranked_dec I append: [configurazione, rango, lambda(i,j)]
-    ranked_dec, ranked_conf, configurations = loadSortRank()
+    ranked_dec, ranked_conf, configurations_dec, configurations_conf = loadSortRank()
 
     if phase == "deconfined":
         ranked_ = ranked_dec
+        configurations = configurations_dec
     elif phase == "confined":
         ranked_ = ranked_conf
+        configurations = configurations_conf
 
     bin_size = len(ranked_) // num_bins
     print("size", bin_size)
@@ -457,7 +473,7 @@ def plotdata():
 
     # Is0 with KDE
     plt.figure()
-    plt.title(r"$I_{s_0}$ with KDE", fontsize=20)
+    plt.title(r"$I_{s_0}$, KDE, " f"{phase} phase", fontsize=16)
     plt.errorbar(
         mean_eigenvalues,
         Is0_with_kde,
@@ -482,7 +498,7 @@ def plotdata():
 
     # Is0 without KDE
     plt.figure()
-    plt.title(r"$I_{s_0}$", fontsize=20)
+    plt.title(r"$I_{s_0}$" f"{phase} phase", fontsize=16)
     plt.errorbar(
         mean_eigenvalues,
         Is0,
@@ -494,20 +510,28 @@ def plotdata():
         color="blue",
     )
     plt.axhline(y=0.117, color="darkorchid", linestyle="--")
-    plt.axhline(y=0.196, color="darkorchid", linestyle="--")
+    # plt.axhline(y=0.196, color="darkorchid", linestyle="--")
     plt.axhline(y=0.398, color="plum", linestyle="--")
-    plt.text(0.02, 0.398, "Poisson", verticalalignment="bottom", color="darkorchid")
-    plt.text(0.005, 0.117, "RMT", verticalalignment="bottom", color="plum")
+
+    if phase == "confined":
+        plt.text(
+            0.002, 0.398, "Poisson", verticalalignment="bottom", color="darkorchid"
+        )
+        plt.text(-0.0003, 0.117, "RMT", verticalalignment="bottom", color="plum")
+    if phase == "deconfined":
+        plt.text(0.02, 0.398, "Poisson", verticalalignment="bottom", color="darkorchid")
+        plt.text(0.005, 0.117, "RMT", verticalalignment="bottom", color="plum")
+
     plt.legend()
     plt.xlabel(r"$\lambda$", fontsize=15)
     plt.tight_layout()
     plt.grid(True)
-    plt.ylabel(r"$I_{s0}$", fontsize=15)
+    plt.ylabel(r"$I_{s_{0}}$", fontsize=15)
     plt.show()
 
     # Mean Spacing
     plt.figure()
-    plt.title("Mean spacings", fontsize=20)
+    plt.title(f"Mean spacings {phase} phase", fontsize=16)
     plt.errorbar(
         mean_eigenvalues,
         mean_spacings,
@@ -527,7 +551,7 @@ def plotdata():
 
     # IPR
     plt.figure()
-    plt.title(r" IPR vs  $\lambda$ " f" for {phase} phase", fontsize=20)
+    plt.title(r" IPR vs  $\lambda$ " f" for {phase} phase", fontsize=16)
     # plt.scatter(mean_eigenvalues_dec, pr_ipr, marker="+", color="blue")
     plt.errorbar(
         mean_lambda_ipr,
@@ -548,7 +572,7 @@ def plotdata():
 
     # PR
     plt.figure()
-    plt.title(r" PR vs  $\lambda$ " f" for {phase} phase", fontsize=20)
+    plt.title(r" PR vs  $\lambda$ " f" for {phase} phase", fontsize=16)
     plt.errorbar(
         mean_lambda_ipr,
         PR,
@@ -599,7 +623,7 @@ def lambda_edge_via_IPR():
     print("Inflection points (λ values):", valid_inflection_points)
 
     plt.figure()
-    plt.title(r" IPR vs  $\lambda$ " f" for {phase} phase", fontsize=20)
+    plt.title(r" IPR vs  $\lambda$ " f" for {phase} phase", fontsize=16)
     # plt.scatter(mean_eigenvalues_dec, pr_ipr, marker="+", color="blue")
     plt.errorbar(
         lambda_values,
@@ -668,7 +692,7 @@ def lambda_edge_via_Is0():
         fitted_Is0_m = cubic_spline_m(dense_lambda)
 
         plt.figure()
-        plt.title(r"$I_{s_0}$", fontsize=20)
+        plt.title(r"$I_{s_0}$", fontsize=16)
         plt.errorbar(
             lambda_values,
             Is0,
@@ -697,7 +721,7 @@ if __name__ == "__main__":
     # make_dirs()
     # spectralRegionsAnalysis()
     # topological_charge()
-    IPR_and_PR()
+    # IPR_and_PR()
     plotdata()
     # lambda_edge_via_IPR()
     # lambda_edge_via_Is0()

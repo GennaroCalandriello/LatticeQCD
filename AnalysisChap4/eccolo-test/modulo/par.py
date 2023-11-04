@@ -4,10 +4,10 @@ from modulo.stats import FreedmanDiaconis
 s_0 = 0.508
 Ns = 36
 Nt = 22
-Volume = Ns**3 * Nt
+Volume = Ns**3
 Is0crit = 0.196
 phase = "deconfined"
-calculate_errors = False
+calculate_errors = True
 
 if phase == "confined":
     fakevec = np.linspace(0, 1, 35600)
