@@ -9,6 +9,7 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import CubicSpline
 from sympy import plot
 
+#test commit
 from modulo.functions import *
 from modulo.stats import *
 
