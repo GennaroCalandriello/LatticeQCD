@@ -378,6 +378,7 @@ def mobility_edge():
     np.savetxt(f"{pathData}/lambda_edge.txt", lambda_edge, fmt="%.18e %.18e")
 
 def lambda_estimate():
+    
     Lamb, _ = np.loadtxt(f"{pathData}/lambda_edge.txt", unpack=True)
     #calculate mean and std of lambda_c
     Lamb = Lamb[2:]
