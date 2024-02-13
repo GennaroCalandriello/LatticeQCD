@@ -23,7 +23,7 @@ if phase == "confined":
 elif phase == "deconfined":
     fakevec = np.linspace(0, 1, 33200)
 
-# num_bins = FreedmanDiaconis(fakevec)
-num_bins = 17
+num_bins = FreedmanDiaconis(fakevec)
+num_bins -= 0
 degrees = 3  # must be 1<= k <=5
 plotlimit = 25

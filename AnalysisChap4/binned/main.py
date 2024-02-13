@@ -208,6 +208,7 @@ def spacingCalculus(bins):
 
         # here I calculate the error on Is0 and on the mean spacing
         # kind= 1 for Is0, kind=2 for mean spacing
+        print(spacing)
         if calculate_errors:
             sigma2_errors.append(errorAnalysis(count_ev_in_bin, spacing, kind=5))
             errors_Is0.append(errorAnalysis(count_ev_in_bin, spacing, kind=1))
@@ -418,6 +419,8 @@ def SpatialExt():
 
 
 def plotdata():
+    pathDataconf = "data_analysis/confined/data/"
+    pathErrorsconf = "data_analysis/confined/errors/"
     Is0_with_kde = np.loadtxt(f"{pathData}/Is0_with_kde.txt")
     Is0 = np.loadtxt(f"{pathData}/Is0.txt")
     mean_eigenvalues = np.loadtxt(f"{pathData}/mean_eigenvalues.txt")
@@ -425,6 +428,9 @@ def plotdata():
     IPR = np.loadtxt(f"{pathData}/ipr_{phase}.txt")
     PR = np.loadtxt(f"{pathData}/pr_{phase}.txt")
     mean_lambda_ipr = np.loadtxt(f"{pathData}/mean_eigenvalues_{phase}.txt")
+    mean_lambda_ipr_conf = np.loadtxt(f"{pathDataconf}/mean_eigenvalues_confined.txt")
+    IPRconf = np.loadtxt(f"{pathDataconf}/ipr_confined.txt")
+    PRconf = np.loadtxt(f"{pathDataconf}/pr_confined.txt")
 
     if calculate_errors:
         mean_spacings_errors = np.loadtxt(f"{pathErrors}/mean_spacings_errors.txt")
@@ -432,6 +438,8 @@ def plotdata():
         errors_Is0_with_kde = np.loadtxt(f"{pathErrors}/Is0_with_kde_errors.txt")
         ipr_errors = np.loadtxt(f"{pathErrors}/ipr_errors_{phase}.txt")
         pr_errors = np.loadtxt(f"{pathErrors}/pr_errors_{phase}.txt")
+        ipr_errors_confined = np.loadtxt(f"{pathErrorsconf}/ipr_errors_confined.txt")
+        pr_errors_confined = np.loadtxt(f"{pathErrorsconf}/pr_errors_confined.txt")
 
     else:
         mean_spacings_errors = np.zeros(len(mean_spacings))
@@ -470,15 +478,25 @@ def plotdata():
         capsize=5,
         color="r",
         ecolor="b",
-        label="Is0",
+        label=r"$I_{s_0}$",
+        elinewidth=0.8,
     )
-    plt.axhline(y=0.117, color="darkorchid", linestyle="--")
-    plt.axhline(y=0.398, color="plum", linestyle="--")
-    plt.text(0.02, 0.398, "Poisson", verticalalignment="bottom", color="darkorchid")
-    plt.text(0.005, 0.117, "RMT", verticalalignment="bottom", color="plum")
-    plt.legend()
+    plt.axhline(y=0.117, color="darkorchid", linestyle="--", linewidth=1.2)
+    plt.axhline(y=0.398, color="plum", linestyle="--", linewidth=1.2)
+    plt.axhline(y=0.196, color="red", linestyle="-.", linewidth=1.2)
+    plt.text(
+        0.02,
+        0.398,
+        "Poisson",
+        verticalalignment="bottom",
+        color="darkorchid",
+        fontsize=14,
+    )
+    plt.text(0.005, 0.117, "RMT", verticalalignment="bottom", color="plum", fontsize=14)
+    plt.legend(loc="upper right", fontsize=14)
     plt.xlabel(r"$\lambda$", fontsize=15)
     plt.tight_layout()
+    plt.ylim(0, 0.45)
     plt.grid(True)
     plt.ylabel(r"$I_{s0}$", fontsize=15)
     plt.show()
@@ -500,23 +518,40 @@ def plotdata():
         capsize=5,
         color="blue",
         ecolor="orangered",
-        label="Is0",
+        label=r"$I_{s_0}$",
+        elinewidth=0.8,
     )
 
-    plt.axhline(y=0.117, color="darkorchid", linestyle="--")
-    # plt.axhline(y=0.196, color="darkorchid", linestyle="--")
-    plt.axhline(y=0.398, color="plum", linestyle="--")
+    plt.axhline(y=0.117, color="darkorchid", linestyle="--", linewidth=1.2)
+    plt.axhline(y=0.196, color="red", linestyle="-.", linewidth=1.2)
+    plt.axhline(y=0.398, color="plum", linestyle="--", linewidth=1.2)
 
     if phase == "confined":
         plt.text(
-            0.002, 0.398, "Poisson", verticalalignment="bottom", color="darkorchid"
+            0.002,
+            0.398,
+            "Poisson",
+            verticalalignment="bottom",
+            color="darkorchid",
+            fontsize=14,
         )
-        plt.text(-0.0004, 0.117, "RMT", verticalalignment="bottom", color="plum")
+        plt.text(
+            -0.0004, 0.117, "RMT", verticalalignment="bottom", color="plum", fontsize=14
+        )
     if phase == "deconfined":
-        plt.text(0.02, 0.398, "Poisson", verticalalignment="bottom", color="darkorchid")
-        plt.text(0.005, 0.117, "RMT", verticalalignment="bottom", color="plum")
+        plt.text(
+            0.02,
+            0.398,
+            "Poisson",
+            verticalalignment="bottom",
+            color="darkorchid",
+            fontsize=14,
+        )
+        plt.text(
+            0.005, 0.117, "RMT", verticalalignment="bottom", color="plum", fontsize=14
+        )
 
-    plt.legend()
+    plt.legend(loc="upper right", fontsize=14)
     plt.xlabel(r"$\lambda$", fontsize=15)
     plt.tight_layout()
     plt.grid(True)
@@ -549,7 +584,7 @@ def plotdata():
     # IPR
 
     plt.figure(figsize=(8, 7))
-    plt.title(r" IPR vs  $\lambda$ " f" for {phase} phase", fontsize=16)
+    plt.title(r" IPR vs  $\lambda$ " f" for both phases", fontsize=16)
 
     plt.errorbar(
         mean_lambda_ipr,
@@ -560,19 +595,42 @@ def plotdata():
         capsize=5,
         color="green",
         ecolor="blue",
-        label="IPR",
+        elinewidth=0.8,
+        label="IPR deconfined",
+    )
+    plt.errorbar(
+        mean_lambda_ipr_conf,
+        IPRconf,
+        yerr=np.array(ipr_errors_confined) * 3,
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        color="red",
+        ecolor="orange",
+        elinewidth=0.8,
+        label="IPR confined",
+    )
+    plt.axvspan(
+        0.01490,
+        0.01558,
+        color="blue",
+        alpha=0.1,
+        linestyle="dashed",
+        linewidth=0.5,
+        label=r"$\lambda_{c}$",
     )
 
     plt.xlabel(r"$\lambda$", fontsize=15)
     plt.ylabel(r"$\langle$ IPR $ \rangle$", fontsize=15)
     plt.tight_layout()
+    plt.legend(loc="upper right", fontsize=14)
     plt.grid(True)
     plt.show()
 
     # PR
     pr_errors = ipr_errors / (2 * IPR**2)
     plt.figure(figsize=(8, 7))
-    plt.title(r" PR vs  $\lambda$ " f" for {phase} phase", fontsize=16)
+    plt.title(r" PR vs  $\lambda$ " f" for both phases", fontsize=16)
     plt.errorbar(
         mean_lambda_ipr,
         PR / Volume,
@@ -582,12 +640,34 @@ def plotdata():
         capsize=5,
         color="b",
         ecolor="g",
-        label="IPR",
+        label="PR deconfined",
         elinewidth=0.8,
+    )
+    plt.errorbar(
+        mean_lambda_ipr_conf,
+        PRconf / Volume,
+        yerr=np.array(pr_errors_confined),
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        color="r",
+        ecolor="orange",
+        label="PR confined",
+        elinewidth=0.8,
+    )
+    plt.axvspan(
+        0.01490,
+        0.01558,
+        color="blue",
+        alpha=0.1,
+        linestyle="dashed",
+        linewidth=0.5,
+        label=r"$\lambda_{c}$",
     )
     plt.xlabel(r"$\lambda$", fontsize=15)
     plt.ylabel(r"$\langle$ PR $ \rangle$", fontsize=15)
     plt.tight_layout()
+    plt.legend(loc="lower right", fontsize=14)
     plt.grid(True)
     plt.show()
 
@@ -1005,18 +1085,46 @@ def sigma2_Is0():
     plt.show()
 
 
+def plot_dirac_spectrum():
+    ranked_dec, ranked_conf, _, _ = loadSortRank()
+    edeconfined, econfined, topodec, topoconf = loadtxt(topocool=True)
+    # create a list with all the eigenvalues in the first 10 configurations
+
+    plt.figure(figsize=(8, 7))
+    plt.title("Dirac Spectrum")
+    labels = ["x", "^", "s", "v"]
+    for i in range(4):
+        plt.plot(
+            edeconfined[i][4:204],
+            labels[i],
+            label=f"Configuration {i+1}",
+            markersize=2,
+        )
+    plt.legend(fontsize=12)
+    plt.xlabel("n", fontsize=15)
+    plt.ylabel(r"$\lambda_n$", fontsize=15)
+    # add horizontal line at y =0
+    plt.axhline(y=0, color="blue", linestyle="-.", linewidth=0.8)
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
+
+
 # Example usage
 # sigma2_Is0("path_to_data", "phase_name")
 
 
 if __name__ == "__main__":
+    # Here, the function you can call
+    #
     # make_dirs()
-    spectralRegionsAnalysis()
+    # spectralRegionsAnalysis()
+
     # plot_histograms()
     # topological_charge()
     # IPR_and_PR()
     # plotdata()
-    sigma2_Is0()
+    # sigma2_Is0()
 
     # lambda_edge_via_IPR()
     # lambda_edge_via_Is0()
@@ -1024,4 +1132,5 @@ if __name__ == "__main__":
     # spatial_extension_ev()
     # cumulative_fill_fraction()
     # IPR_and_PR()
+    plot_dirac_spectrum()
     pass

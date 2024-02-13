@@ -29,6 +29,7 @@ def ricampionamento(array_osservabile, bin):
     return np.array(sample)
 
 
+@njit()
 def compute_Is0(num_ev, spacing):
     less_than_s_0 = 0
 
@@ -62,7 +63,7 @@ def bootstrap_(array_osservabile, num_ev, kind, bin):
     kind = 1 for Is0, kind = 2 for KDE evaluation errors, kind = 3 for simple mean"""
     mean_array = []
 
-    for _ in range(100):
+    for _ in range(60):
         sample = ricampionamento(array_osservabile, bin)
         if kind == 1:
             mean_array.append(
