@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from keras.layers import Layer, Dense, Embedding, Flatten, Concatenate, Input
 
-EPOCHS = 300
+EPOCHS = 20
 BATCH_SIZE = 5  # Number of eigenvalue sets
 START_EV = 0
 END_EV = 80
@@ -74,8 +74,9 @@ def build_generator(noise_dim):
 
     # Potresti voler aggiungere layer aggiuntivi o modificare le dimensioni a seconda della complessità desiderata
     x = Dense(128, activation="relu")(noise_input)
-    x = Dense(128, activation="relu")(x)
+    # x = Dense(128, activation="relu")(x)
     x = Dense(64, activation="relu")(x)
+    # x = Dense(16, activation="relu")(x)
 
     # Output layer: si adatta per generare triplette
     # Assumi che ogni componente della tripletta sia un singolo valore scalare
@@ -89,8 +90,9 @@ def build_discriminator():
     input_triplet = Input(shape=(3,))  # Triplette di input: lambda, conf, posizione
 
     x = SpectralNormalization(Dense(128, activation="relu"))(input_triplet)
+    # x = SpectralNormalization(Dense(64, activation="relu"))(x)
     x = SpectralNormalization(Dense(64, activation="relu"))(x)
-    x = SpectralNormalization(Dense(64, activation="relu"))(x)
+    # x = SpectralNormalization(Dense(16, activation="relu"))(x)
 
     # Output layer: classifica la tripletta come reale o falsa
     output = SpectralNormalization(Dense(1, activation="sigmoid"))(x)
@@ -101,7 +103,7 @@ def build_discriminator():
 
 
 def custom_loss(y_true, y_pred):
-    weights = tf.constant([1, 1, 1], dtype=tf.float32)
+    weights = tf.constant([0.8, 0.9, 0.3], dtype=tf.float32)
 
     # calcola la perdita ponderata
     squared_difference = tf.square(y_true - y_pred)

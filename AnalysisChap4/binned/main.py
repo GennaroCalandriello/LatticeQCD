@@ -419,6 +419,8 @@ def SpatialExt():
 
 
 def plotdata():
+    only_ipr = True
+
     pathDataconf = "data_analysis/confined/data/"
     pathErrorsconf = "data_analysis/confined/errors/"
     Is0_with_kde = np.loadtxt(f"{pathData}/Is0_with_kde.txt")
@@ -426,119 +428,54 @@ def plotdata():
     mean_eigenvalues = np.loadtxt(f"{pathData}/mean_eigenvalues.txt")
     mean_spacings = np.loadtxt(f"{pathData}/mean_spacings.txt")
     IPR = np.loadtxt(f"{pathData}/ipr_{phase}.txt")
-    PR = np.loadtxt(f"{pathData}/pr_{phase}.txt")
+    # PR = np.loadtxt(f"{pathData}/pr_{phase}.txt") / Volume
     mean_lambda_ipr = np.loadtxt(f"{pathData}/mean_eigenvalues_{phase}.txt")
     mean_lambda_ipr_conf = np.loadtxt(f"{pathDataconf}/mean_eigenvalues_confined.txt")
     IPRconf = np.loadtxt(f"{pathDataconf}/ipr_confined.txt")
-    PRconf = np.loadtxt(f"{pathDataconf}/pr_confined.txt")
+    print("LUHGOOOOOOOOO", len(IPRconf))
+    # PRconf = np.loadtxt(f"{pathDataconf}/pr_confined.txt")
 
     if calculate_errors:
         mean_spacings_errors = np.loadtxt(f"{pathErrors}/mean_spacings_errors.txt")
         errors_Is0 = np.loadtxt(f"{pathErrors}/Is0_errors.txt")
         errors_Is0_with_kde = np.loadtxt(f"{pathErrors}/Is0_with_kde_errors.txt")
         ipr_errors = np.loadtxt(f"{pathErrors}/ipr_errors_{phase}.txt")
-        pr_errors = np.loadtxt(f"{pathErrors}/pr_errors_{phase}.txt")
         ipr_errors_confined = np.loadtxt(f"{pathErrorsconf}/ipr_errors_confined.txt")
-        pr_errors_confined = np.loadtxt(f"{pathErrorsconf}/pr_errors_confined.txt")
+        pr, pr_errors = PR(IPR, ipr_errors)
+        PRconf, pr_errors_confined = PR(IPRconf, ipr_errors_confined)
+        # pr_errors = np.zeros(len(IPR))
+        # pr_errors_confined = np.zeros(len(IPRconf))
 
     else:
         mean_spacings_errors = np.zeros(len(mean_spacings))
         errors_Is0 = np.zeros(len(Is0))
         errors_Is0_with_kde = np.zeros(len(Is0_with_kde))
         ipr_errors = np.zeros(len(IPR))
-        pr_errors = np.zeros(len(PR))
-
-    def spline_shaded(data, errors, mean_eigenvalues, plotlimit):
-        """Realize smoothing for the data and the errors, to plot shaded regions"""
-
-        upper_bound = np.array(data) + np.array(errors) / 2
-        lower_bound = np.array(data) - np.array(errors) / 2
-
-        spline_upper = UnivariateSpline(mean_eigenvalues[0:plotlimit], upper_bound, s=0)
-        spline_lower = UnivariateSpline(mean_eigenvalues[0:plotlimit], lower_bound, s=0)
-        x_smooth = np.linspace(
-            min(mean_eigenvalues[0:plotlimit]), max(mean_eigenvalues[0:plotlimit]), 300
-        )
-        upper_smooth = spline_upper(x_smooth)
-        lower_smooth = spline_lower(x_smooth)
-        return x_smooth, upper_smooth, lower_smooth
+        pr_errors = np.zeros(len(IPR))
+        ipr_errors_confined = np.zeros(len(IPRconf))
+        pr_errors_confined = np.zeros(len(IPRconf))
 
     # Is0 with KDE
     # ipr_errors *= np.sqrt(len(IPR))
+    if not only_ipr:
+        plt.figure(figsize=(8, 7))
+        plt.title(r"$I_{s_0}$, KDE, " f"{phase} phase", fontsize=16)
 
-    plt.figure(figsize=(8, 7))
-    plt.title(r"$I_{s_0}$, KDE, " f"{phase} phase", fontsize=16)
-
-    plt.errorbar(
-        mean_eigenvalues[0:plotlimit],
-        Is0_with_kde[0:plotlimit],
-        yerr=np.array(errors_Is0_with_kde[0:plotlimit]) / 2,
-        fmt="x",
-        barsabove=True,
-        capsize=5,
-        color="r",
-        ecolor="b",
-        label=r"$I_{s_0}$",
-        elinewidth=0.8,
-    )
-    plt.axhline(y=0.117, color="darkorchid", linestyle="--", linewidth=1.2)
-    plt.axhline(y=0.398, color="plum", linestyle="--", linewidth=1.2)
-    plt.axhline(y=0.196, color="red", linestyle="-.", linewidth=1.2)
-    plt.text(
-        0.02,
-        0.398,
-        "Poisson",
-        verticalalignment="bottom",
-        color="darkorchid",
-        fontsize=14,
-    )
-    plt.text(0.005, 0.117, "RMT", verticalalignment="bottom", color="plum", fontsize=14)
-    plt.legend(loc="upper right", fontsize=14)
-    plt.xlabel(r"$\lambda$", fontsize=15)
-    plt.tight_layout()
-    plt.ylim(0, 0.45)
-    plt.grid(True)
-    plt.ylabel(r"$I_{s0}$", fontsize=15)
-    plt.show()
-
-    # Is0 without KDE
-
-    plt.figure(figsize=(8, 7))
-    plt.title(r"$I_{s_0}$" f"{phase} phase", fontsize=16)
-    # Add shaded region
-    errors_Is0 = np.array(errors_Is0)
-    # errors_Is0 = errors_Is0 / np.sqrt(len(Is0))
-    errors_Is0 = errors_Is0 / 2
-    plt.errorbar(
-        mean_eigenvalues[0:plotlimit],
-        Is0[0:plotlimit],
-        yerr=np.array(errors_Is0[0:plotlimit]) / 2,
-        fmt="x",
-        barsabove=True,
-        capsize=5,
-        color="blue",
-        ecolor="orangered",
-        label=r"$I_{s_0}$",
-        elinewidth=0.8,
-    )
-
-    plt.axhline(y=0.117, color="darkorchid", linestyle="--", linewidth=1.2)
-    plt.axhline(y=0.196, color="red", linestyle="-.", linewidth=1.2)
-    plt.axhline(y=0.398, color="plum", linestyle="--", linewidth=1.2)
-
-    if phase == "confined":
-        plt.text(
-            0.002,
-            0.398,
-            "Poisson",
-            verticalalignment="bottom",
-            color="darkorchid",
-            fontsize=14,
+        plt.errorbar(
+            mean_eigenvalues[0:plotlimit],
+            Is0_with_kde[0:plotlimit],
+            yerr=np.array(errors_Is0_with_kde[0:plotlimit]) / 2,
+            fmt="x",
+            barsabove=True,
+            capsize=5,
+            color="r",
+            ecolor="b",
+            label=r"$I_{s_0}$",
+            elinewidth=0.8,
         )
-        plt.text(
-            -0.0004, 0.117, "RMT", verticalalignment="bottom", color="plum", fontsize=14
-        )
-    if phase == "deconfined":
+        plt.axhline(y=0.117, color="darkorchid", linestyle="--", linewidth=1.2)
+        plt.axhline(y=0.398, color="plum", linestyle="--", linewidth=1.2)
+        plt.axhline(y=0.196, color="red", linestyle="-.", linewidth=1.2)
         plt.text(
             0.02,
             0.398,
@@ -550,39 +487,105 @@ def plotdata():
         plt.text(
             0.005, 0.117, "RMT", verticalalignment="bottom", color="plum", fontsize=14
         )
+        plt.legend(loc="upper right", fontsize=14)
+        plt.xlabel(r"$\lambda$", fontsize=15)
+        plt.tight_layout()
+        plt.ylim(0, 0.45)
+        plt.grid(True)
+        plt.ylabel(r"$I_{s0}$", fontsize=15)
+        plt.show()
 
-    plt.legend(loc="upper right", fontsize=14)
-    plt.xlabel(r"$\lambda$", fontsize=15)
-    plt.tight_layout()
-    plt.grid(True)
-    plt.ylabel(r"$I_{s_{0}}$", fontsize=15)
-    plt.show()
+        # Is0 without KDE
 
-    # Mean Spacing
+        plt.figure(figsize=(8, 7))
+        plt.title(r"$I_{s_0}$" f"{phase} phase", fontsize=16)
+        # Add shaded region
+        errors_Is0 = np.array(errors_Is0)
+        # errors_Is0 = errors_Is0 / np.sqrt(len(Is0))
+        errors_Is0 = errors_Is0 / 2
+        plt.errorbar(
+            mean_eigenvalues[0:plotlimit],
+            Is0[0:plotlimit],
+            yerr=np.array(errors_Is0[0:plotlimit]) / 2,
+            fmt="x",
+            barsabove=True,
+            capsize=5,
+            color="blue",
+            ecolor="orangered",
+            label=r"$I_{s_0}$",
+            elinewidth=0.8,
+        )
 
-    plt.figure(figsize=(8, 7))
-    plt.title(f"Mean spacings {phase} phase", fontsize=16)
-    plt.errorbar(
-        mean_eigenvalues[0:plotlimit],
-        mean_spacings[0:plotlimit],
-        yerr=np.array(mean_spacings_errors[0:plotlimit]) / 2,
-        fmt="x",
-        barsabove=True,
-        capsize=5,
-        color="plum",
-        ecolor="darkorchid",
-        label="Mean spacings",
-        elinewidth=0.8,
-    )
-    plt.xlabel(r"$\lambda$", fontsize=15)
-    plt.ylabel(r"$\langle s \rangle$", fontsize=15)
-    plt.axhline(y=1, color="g", linestyle="--")
-    plt.tight_layout()
-    plt.grid(True)
-    plt.show()
+        plt.axhline(y=0.117, color="darkorchid", linestyle="--", linewidth=1.2)
+        plt.axhline(y=0.196, color="red", linestyle="-.", linewidth=1.2)
+        plt.axhline(y=0.398, color="plum", linestyle="--", linewidth=1.2)
+
+        if phase == "confined":
+            plt.text(
+                0.002,
+                0.398,
+                "Poisson",
+                verticalalignment="bottom",
+                color="darkorchid",
+                fontsize=14,
+            )
+            plt.text(
+                -0.0004,
+                0.117,
+                "RMT",
+                verticalalignment="bottom",
+                color="plum",
+                fontsize=14,
+            )
+        if phase == "deconfined":
+            plt.text(
+                0.02,
+                0.398,
+                "Poisson",
+                verticalalignment="bottom",
+                color="darkorchid",
+                fontsize=14,
+            )
+            plt.text(
+                0.005,
+                0.117,
+                "RMT",
+                verticalalignment="bottom",
+                color="plum",
+                fontsize=14,
+            )
+
+        plt.legend(loc="upper right", fontsize=14)
+        plt.xlabel(r"$\lambda$", fontsize=15)
+        plt.tight_layout()
+        plt.grid(True)
+        plt.ylabel(r"$I_{s_{0}}$", fontsize=15)
+        plt.show()
+
+        # Mean Spacing
+
+        plt.figure(figsize=(8, 7))
+        plt.title(f"Mean spacings {phase} phase", fontsize=16)
+        plt.errorbar(
+            mean_eigenvalues[0:plotlimit],
+            mean_spacings[0:plotlimit],
+            yerr=np.array(mean_spacings_errors[0:plotlimit]) / 2,
+            fmt="x",
+            barsabove=True,
+            capsize=5,
+            color="plum",
+            ecolor="darkorchid",
+            label="Mean spacings",
+            elinewidth=0.8,
+        )
+        plt.xlabel(r"$\lambda$", fontsize=15)
+        plt.ylabel(r"$\langle s \rangle$", fontsize=15)
+        plt.axhline(y=1, color="g", linestyle="--")
+        plt.tight_layout()
+        plt.grid(True)
+        plt.show()
 
     # IPR
-
     plt.figure(figsize=(8, 7))
     plt.title(r" IPR vs  $\lambda$ " f" for both phases", fontsize=16)
 
@@ -628,12 +631,12 @@ def plotdata():
     plt.show()
 
     # PR
-    pr_errors = ipr_errors / (2 * IPR**2)
+    _, pr_errors = PR(np.loadtxt(f"{pathErrors}/pr_errors_deconfined.txt"), ipr_errors)
     plt.figure(figsize=(8, 7))
     plt.title(r" PR vs  $\lambda$ " f" for both phases", fontsize=16)
     plt.errorbar(
         mean_lambda_ipr,
-        PR / Volume,
+        PR,
         yerr=np.array(pr_errors),
         fmt="x",
         barsabove=True,
@@ -804,7 +807,6 @@ def cumulative_fill_fraction():
     PR /= max(PR)
     PRup = PR + PRerrors
     PRdown = PR - PRerrors
-    PR /= max(PR)
     lambda_values = np.loadtxt(f"{pathData}/mean_eigenvalues_{phase}.txt")
     CVFF = np.zeros_like(PR)
     CVFFup = np.zeros_like(PR)
@@ -1110,11 +1112,276 @@ def plot_dirac_spectrum():
     plt.show()
 
 
-# Example usage
-# sigma2_Is0("path_to_data", "phase_name")
+def IPR_and_PR_duepuntozero():
+    # load the data (remember that IPR^(-1) \approx Ns^3*PR)
+    (
+        d,
+        c,
+    ) = loadtxt(topocool=False)
+
+    configurations = len(d[:, 0])
+    # organize the data
+    if phase == "deconfined":
+        d = d
+    elif phase == "confined":
+        d = c
+    mean_eigenvalues_ = mean_eigenvalues(
+        np.abs(d[:, 4:204])
+    )  # here the mean on all configurations of all \lambda
+    # ipr_ = d[:, 204 : 22 * ev + 204]
+    d = d[:, 204:]
+    ipr_ = np.zeros((configurations, Nt * positive_ev))
+    print("shape of ipr_", ipr_.shape)
+
+    for i in range(configurations):
+        selected_elements = []
+
+        for j in range(0, Nt * ev, 2 * Nt):
+            selected_elements.extend(d[i, j : j + Nt])
+
+        print("len selected elements", len(selected_elements))
+        ipr_[i] = np.array(selected_elements)
+
+    ipr_errors = np.loadtxt(f"{pathErrors}/ipr_errors_{phase}.txt")
+    ipr = np.zeros((configurations, positive_ev))
+
+    # sum ipr over all time slices for each \lam for each configuration
+    alcuni_ipr_t = []
+    for i in range(configurations):
+        for j in range(positive_ev):
+            ipr[i][j] = np.mean(ipr_[i][j * Nt : (j + 1) * Nt])
+            if i == 3:
+                alcuni_ipr_t.append(ipr_[i][j * Nt : (j + 1) * Nt])
+
+    ipr_mean = np.zeros((positive_ev))
+    for i in range(positive_ev):
+        ipr_mean[i] = np.mean(ipr[:, i])
+
+    pr, pr_errors = PR(ipr_mean, ipr_errors)
+
+    # SAVE DATA
+    np.savetxt(f"{pathData}/ipr_{phase}.txt", ipr_mean)
+    np.savetxt(f"{pathData}/pr_{phase}.txt", pr)
+    np.savetxt(f"{pathData}/mean_eigenvalues_{phase}.txt", mean_eigenvalues_)
+    np.savetxt(f"data_analysis/{phase}/ipr_t_{phase}.txt", alcuni_ipr_t)
+
+
+def PR(ipr, ipr_errors):
+
+    pr = 1 / (ipr * Ns**3 * Nt)
+    pr_errors = ipr_errors / (ipr * Ns**3 * Nt) ** 2
+
+    return pr, pr_errors
+
+
+def errorFunction():
+    "calculate the errors for the IPR and PR and save them in a file"
+    # load the data (remember that IPR^(-1) \approx Ns^3*PR)
+    Nt = 22
+    Ns = 36  # questo devo chiederlo a Francesco D'Angelo
+    ev = 200
+    positive_ev = 100
+
+    (
+        d,
+        c,
+    ) = loadtxt(topocool=False)
+
+    configurations = len(d[:, 0])
+    # organize the data
+    if phase == "deconfined":
+        d = d
+    elif phase == "confined":
+        d = c
+    mean_eigenvalues_ = mean_eigenvalues(
+        np.abs(d[:, 4:204])
+    )  # here the mean on all configurations of all \lambda
+    # ipr_ = d[:, 204 : 22 * ev + 204]
+    d = d[:, 204:]
+    ipr_ = np.zeros((configurations, Nt * positive_ev))
+    print("shape of ipr_", ipr_.shape)
+
+    for i in range(configurations):
+        selected_elements = []
+
+        for j in range(0, Nt * ev, 2 * Nt):
+            selected_elements.extend(d[i, j : j + Nt])
+
+        print("len selected elements", len(selected_elements))
+        ipr_[i] = np.array(selected_elements)
+
+    new_ipr = []
+    ipr_errors = (np.loadtxt(f"{pathErrors}/ipr_errors_{phase}.txt")).tolist()
+    ipr = np.zeros((configurations, positive_ev))
+
+    ipr_mean = np.zeros((positive_ev))
+    for i in range(positive_ev):
+        ipr_mean[i] = np.mean(ipr[:, i])
+
+    pr, pr_errors = PR(ipr_mean, ipr_errors)
+
+    # sum ipr over all time slices for each \lam for each configuration
+
+    for e in range(positive_ev):
+        err = errorAnalysis(None, ipr[:, e], kind=3)
+        ipr_errors.append(err)
+    print("last error", err)
+    np.savetxt(f"{pathErrors}/ipr_errors_{phase}.txt", ipr_errors)
+    np.savetxt(f"{pathErrors}/pr_errors_{phase}.txt", pr_errors)
+    np.savetxt(f"{pathErrors}/pr_errors_{phase}.txt", pr_errors)
+
+
+def some_time_slices_for_IPR():
+
+    from scipy.stats import gaussian_kde
+
+    alcuni_ipr = np.loadtxt(f"data_analysis/{phase}/ipr_t_{phase}.txt")
+    # perform a kerne density estimation
+    plt.figure(figsize=(8, 7))
+    for i in range(100):
+        if i % 10 == 0:
+            kde = gaussian_kde(alcuni_ipr[i])
+            x_d = np.linspace(min(alcuni_ipr[i]), max(alcuni_ipr[i]), 1000)
+            kde_values = kde(x_d)
+            plt.plot(x_d, kde_values)
+    plt.title("IPR for some time slices, deconfined")
+    plt.xlabel("IPR", fontsize=15)
+    plt.ylabel("t", fontsize=15)
+    plt.show()
+
+    alcuni_ipr_confinati = np.loadtxt(f"data_analysis/confined/ipr_t_confined.txt")
+    # perform a kerne density estimation
+    plt.figure(figsize=(8, 7))
+    for i in range(100):
+        if i % 10 == 0:
+            kde = gaussian_kde(alcuni_ipr_confinati[i])
+            x_d = np.linspace(
+                min(alcuni_ipr_confinati[i]), max(alcuni_ipr_confinati[i]), 1000
+            )
+            kde_values = kde(x_d)
+            plt.plot(x_d, kde_values)
+    plt.title("IPR for some time slices, confined")
+    plt.xlabel("IPR", fontsize=15)
+    plt.ylabel("t", fontsize=15)
+    plt.tight_layout()
+    plt.grid(True)
+    plt.show()
+
+
+def ParticipationPlot():
+
+    mean_lambda_ipr = np.loadtxt(
+        f"data_analysis/deconfined/data/mean_eigenvalues_deconfined.txt"
+    )
+    mean_lambda_ipr_conf = np.loadtxt(
+        f"data_analysis/confined/data/mean_eigenvalues_confined.txt"
+    )
+
+    # Dceonfined
+    IPR = np.loadtxt(f"data_analysis/deconfined/data/ipr_deconfined.txt")
+    ipr_errors = np.loadtxt(
+        f"data_analysis/deconfined/errors/ipr_errors_deconfined.txt"
+    )
+    PRatio, pr_errors = PR(IPR, ipr_errors)
+
+    # confined
+    IPRconf = np.loadtxt(f"data_analysis/confined/data/ipr_confined.txt")
+    ipr_errors_confined = np.loadtxt(
+        f"data_analysis/confined/errors/ipr_errors_confined.txt"
+    )
+    PRconf, pr_errors_confined = PR(IPRconf, ipr_errors_confined)
+
+    # IPR
+    plt.figure(figsize=(8, 7))
+    plt.title(r" IPR vs  $\lambda$ " f" for both phases", fontsize=16)
+
+    plt.errorbar(
+        mean_lambda_ipr,
+        IPR,
+        yerr=np.array(ipr_errors) / 2,
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        color="green",
+        ecolor="blue",
+        elinewidth=0.8,
+        label="IPR deconfined",
+    )
+    plt.errorbar(
+        mean_lambda_ipr_conf,
+        IPRconf,
+        yerr=np.array(ipr_errors_confined) * 3,
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        color="red",
+        ecolor="orange",
+        elinewidth=0.8,
+        label="IPR confined",
+    )
+    plt.axvspan(
+        0.01490,
+        0.01558,
+        color="blue",
+        alpha=0.1,
+        linestyle="dashed",
+        linewidth=0.5,
+        label=r"$\lambda_{c}$",
+    )
+
+    plt.xlabel(r"$\lambda$", fontsize=15)
+    plt.ylabel(r"$\langle$ IPR $ \rangle$", fontsize=15)
+    plt.tight_layout()
+    plt.legend(loc="upper right", fontsize=14)
+    plt.grid(True)
+    plt.show()
+
+    # PR
+    plt.figure(figsize=(8, 7))
+    plt.title(r" PR vs  $\lambda$ " f" for both phases", fontsize=16)
+    plt.errorbar(
+        mean_lambda_ipr,
+        PRatio,
+        yerr=np.array(pr_errors),
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        color="b",
+        ecolor="g",
+        label="PR deconfined",
+        elinewidth=0.8,
+    )
+    plt.errorbar(
+        mean_lambda_ipr_conf,
+        PRconf / Volume,
+        yerr=np.array(pr_errors_confined),
+        fmt="x",
+        barsabove=True,
+        capsize=5,
+        color="r",
+        ecolor="orange",
+        label="PR confined",
+        elinewidth=0.8,
+    )
+    plt.axvspan(
+        0.01490,
+        0.01558,
+        color="blue",
+        alpha=0.1,
+        linestyle="dashed",
+        linewidth=0.5,
+        label=r"$\lambda_{c}$",
+    )
+    plt.xlabel(r"$\lambda$", fontsize=15)
+    plt.ylabel(r"$\langle$ PR $ \rangle$", fontsize=15)
+    plt.tight_layout()
+    plt.legend(loc="lower right", fontsize=14)
+    plt.grid(True)
+    plt.show()
 
 
 if __name__ == "__main__":
+    print("PHASE: ___ ", phase)
     # Here, the function you can call
     #
     # make_dirs()
@@ -1122,8 +1389,12 @@ if __name__ == "__main__":
 
     # plot_histograms()
     # topological_charge()
-    # IPR_and_PR()
+    errorFunction()
+    # IPR_and_PR_duepuntozero()
+    # some_time_slices_for_IPR()
+
     # plotdata()
+    ParticipationPlot()
     # sigma2_Is0()
 
     # lambda_edge_via_IPR()
@@ -1132,5 +1403,4 @@ if __name__ == "__main__":
     # spatial_extension_ev()
     # cumulative_fill_fraction()
     # IPR_and_PR()
-    plot_dirac_spectrum()
-    pass
+    # plot_dirac_spectrum()

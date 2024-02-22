@@ -13,6 +13,11 @@ maxconf = 0.02285429105751834
 mindec = 0.0001640808829788998
 minconf = 1.094816379590008e-05
 
+# our eigenvalues
+ev = 200
+positive_ev = 100
+
+
 phase = "deconfined"
 calculate_errors = False
 savedata = True

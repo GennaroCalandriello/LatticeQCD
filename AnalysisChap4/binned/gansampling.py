@@ -8,7 +8,7 @@ from main import *
 
 num_bins = 40
 NUM_EIGENVALUES = 30  # NUM_EV_FINAL
-num_samples = 300000  # numero di configurazioni da generare
+num_samples = 33000  # numero di configurazioni da generare
 # START_EV = 0
 # END_EV = 100
 
@@ -181,13 +181,13 @@ def CallGAN():
     configurations = np.random.randint(0, NUM_CONFIGURATIONS, num_samples)
     # from normal distribution
     # Genera valori dalla distribuzione normale
-    media = 5
-    dev_std = 2
-    valori_flottanti = np.random.normal(loc=media, scale=dev_std, size=num_samples)
-    # Scala e arrotonda i valori per ottenere interi nel range desiderato
-    configurations = np.clip(np.round(valori_flottanti), 0, NUM_CONFIGURATIONS).astype(
-        int
-    )
+    # media = 5
+    # dev_std = 2
+    # valori_flottanti = np.random.normal(loc=media, scale=dev_std, size=num_samples)
+    # # Scala e arrotonda i valori per ottenere interi nel range desiderato
+    # configurations = np.clip(np.round(valori_flottanti), 0, NUM_CONFIGURATIONS).astype(
+    #     int
+    # )
 
     # shuffle randomly the configurations
 
@@ -238,8 +238,8 @@ def run_model():
 
 def plotting():
     mean = []
-    for i in range(num_bins - 1):
-        s = np.loadtxt(f"{pathData}/spacings_{i+3}.txt")
+    for i in range(1, num_bins - 1):
+        s = np.loadtxt(f"{pathData}/spacings_{i}.txt")
         s = s / np.mean(s)
         sfake = np.linspace(min(s), max(s), len(s))
         GUE = distribution(sfake, "GUE")
@@ -263,7 +263,7 @@ def plotting():
 
 
 if __name__ == "__main__":
-    make_dirs()
-    run_model()
+    # make_dirs()
+    # run_model()
     CallGAN()
     plotting()
