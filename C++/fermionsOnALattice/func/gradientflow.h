@@ -19,5 +19,6 @@ public:
 };
 
 void write(vector<double> const &v, string const &filename);
+void coolingUpdate(Lattice &U, vector<double> &Actions, vector<double> &Qarr);
 
 #endif // GRADIENT_FLOW_H

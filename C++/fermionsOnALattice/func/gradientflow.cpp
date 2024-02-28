@@ -6,6 +6,8 @@
 #include <fstream>
 #include <iostream>
 #include <omp.h>
+#include <string>
+#include <thread>
 #include <vector>
 
 #include "SU3Matrix.h"
@@ -19,7 +21,7 @@
 #include "su2.h"
 
 using namespace std;
-// g++ -fopenmp -g3 -Wall -I/eigen/Eigen gradientflow.cpp SU3Matrix.cpp
+// g++ -fopenmp -g3 -Wall -I/eigen/Eigen gradientflow.cpp SU3Matrix.cpp//
 // cooling.cpp lattice.cpp WilsonAction.cpp heatbath.cpp su2.cpp
 // distributions.cpp -o gradientflow.exe
 // WITHOUT EIGEN LIBRARY g++ -fopenmp -g3 -Wall  gradientflow.cpp SU3Matrix.cpp
@@ -250,109 +252,187 @@ void write(vector<double> const &v, string const &filename) {
   cout << "Written" << endl;
 }
 
+void coolingUpdate(Lattice &U, vector<double> &Actions, vector<double> &Qarr) {
+  Cooling cool;
+  Flow flow;
+  // vector<double> Actions(NstepFlow, 0);
+  // vector<double> Qarr(NstepFlow, 0);
+  for (int nstep = 0; nstep < NstepFlow; nstep++) {
+
+    cout << "-------step------" << nstep << endl;
+
+    // auto start = std::chrono::high_resolution_clock::now();
+    // flow.Flow_update(U);
+    // auto stop = std::chrono::high_resolution_clock::now();
+    // auto duration1 =
+    //     std::chrono::duration_cast<std::chrono::seconds>(stop - start);
+    // cout << "TIME ----> Flow Updating step " << duration1.count() <<
+    //"seconds
+    // "
+    //      << endl;
+
+    double Wbefore = Wilson(U, 1, 1);
+
+    auto start4 = std::chrono::high_resolution_clock::now();
+    cool.Cooling_update(U);
+    auto stop4 = std::chrono::high_resolution_clock::now();
+    auto duration4 =
+        std::chrono::duration_cast<std::chrono::seconds>(stop4 - start4);
+    cout << "TIME ----> Cooling Updating step " << duration4.count()
+         << " seconds" << endl;
+
+    auto start1 = std::chrono::high_resolution_clock::now();
+    double W = Wilson(U, 1, 1);
+    auto stop1 = std::chrono::high_resolution_clock::now();
+    auto duration2 =
+        std::chrono::duration_cast<std::chrono::seconds>(stop1 - start1);
+    cout << "TIME ----> Wilson calculus " << duration2.count() << " seconds"
+         << endl;
+
+    auto start2 = std::chrono::high_resolution_clock::now();
+    double Q = flow.TopologicalCharge(U);
+    auto stop2 = std::chrono::high_resolution_clock::now();
+    auto duration3 =
+        std::chrono::duration_cast<std::chrono::seconds>(stop2 - start2);
+    cout << "TIME ----> Topological Charge " << duration3.count() << "seconds"
+         << endl;
+
+    Actions[nstep] = W;
+
+    cout << "OBS ----> Wilson Action before: " << Wbefore << endl;
+    cout << "OBS ----> Wilson Action: " << W << endl;
+
+    cout << "OBS ----> Topological Charge: " << Q << endl;
+    Qarr[nstep] = Q;
+  }
+}
+
 int main() {
 
   bool execute = true;
 
   if (execute == true) {
 
-    Lattice U = fill();
+    Lattice Uinit = fill();
     // call classes
     Flow flow;
     Heatbath HB;
     Cooling cool;
 
-    HB.HB_update(U, 6.7);
-    vector<double> Actions(NstepFlow, 0);
-    vector<double> Qarr(NstepFlow, 0);
+    HB.HB_update(Uinit, 6.7, 20);
 
-    for (int nstep = 0; nstep < NstepFlow; nstep++) {
+    vector<std::thread> threads;
 
-      cout << "-------step------" << nstep << endl;
+#pragma omp parallel for
+    for (int nconf = 0; nconf < N_conf; nconf++) {
 
-      // auto start = std::chrono::high_resolution_clock::now();
-      // flow.Flow_update(U);
-      // auto stop = std::chrono::high_resolution_clock::now();
-      // auto duration1 =
-      //     std::chrono::duration_cast<std::chrono::seconds>(stop - start);
-      // cout << "TIME ----> Flow Updating step " << duration1.count() <<
-      //"seconds
-      // "
-      //      << endl;
+      vector<double> Actions(NstepFlow, 0);
+      vector<double> Qarr(NstepFlow, 0);
+      Lattice U = Uinit;
+      HB.HB_update(U, 6.7, 2);
+      coolingUpdate(U, Actions, Qarr);
 
-      double Wbefore = Wilson(U, 1, 1);
+      cout << "-------conf------" << nconf << endl;
 
-      auto start4 = std::chrono::high_resolution_clock::now();
-      cool.Cooling_update(U);
-      auto stop4 = std::chrono::high_resolution_clock::now();
-      auto duration4 =
-          std::chrono::duration_cast<std::chrono::seconds>(stop4 - start4);
-      cout << "TIME ----> Cooling Updating step " << duration4.count()
-           << " seconds" << endl;
+      // threads.push_back(std::thread(coolingUpdate, U));
+      //   for (int nstep = 0; nstep < NstepFlow; nstep++) {
 
-      auto start1 = std::chrono::high_resolution_clock::now();
-      double W = Wilson(U, 1, 1);
-      auto stop1 = std::chrono::high_resolution_clock::now();
-      auto duration2 =
-          std::chrono::duration_cast<std::chrono::seconds>(stop1 - start1);
-      cout << "TIME ----> Wilson calculus " << duration2.count() << " seconds"
-           << endl;
+      //     cout << "-------step------" << nstep << endl;
 
-      auto start2 = std::chrono::high_resolution_clock::now();
-      double Q = flow.TopologicalCharge(U);
-      auto stop2 = std::chrono::high_resolution_clock::now();
-      auto duration3 =
-          std::chrono::duration_cast<std::chrono::seconds>(stop2 - start2);
-      cout << "TIME ----> Topological Charge " << duration3.count() << "seconds"
-           << endl;
+      //     // auto start = std::chrono::high_resolution_clock::now();
+      //     // flow.Flow_update(U);
+      //     // auto stop = std::chrono::high_resolution_clock::now();
+      //     // auto duration1 =
+      //     //     std::chrono::duration_cast<std::chrono::seconds>(stop -
+      //     start);
+      //     // cout << "TIME ----> Flow Updating step " << duration1.count() <<
+      //     //"seconds
+      //     // "
+      //     //      << endl;
 
-      Actions[nstep] = W;
+      //     double Wbefore = Wilson(U, 1, 1);
 
-      cout << "OBS ----> Wilson Action before: " << Wbefore << endl;
-      cout << "OBS ----> Wilson Action: " << W << endl;
+      //     auto start4 = std::chrono::high_resolution_clock::now();
+      //     cool.Cooling_update(U);
+      //     auto stop4 = std::chrono::high_resolution_clock::now();
+      //     auto duration4 =
+      //         std::chrono::duration_cast<std::chrono::seconds>(stop4 -
+      //         start4);
+      //     cout << "TIME ----> Cooling Updating step " << duration4.count()
+      //          << " seconds" << endl;
 
-      cout << "OBS ----> Topological Charge: " << Q << endl;
-      Qarr[nstep] = Q;
+      //     auto start1 = std::chrono::high_resolution_clock::now();
+      //     double W = Wilson(U, 1, 1);
+      //     auto stop1 = std::chrono::high_resolution_clock::now();
+      //     auto duration2 =
+      //         std::chrono::duration_cast<std::chrono::seconds>(stop1 -
+      //         start1);
+      //     cout << "TIME ----> Wilson calculus " << duration2.count() << "
+      //     seconds"
+      //          << endl;
+
+      //     auto start2 = std::chrono::high_resolution_clock::now();
+      //     double Q = flow.TopologicalCharge(U);
+      //     auto stop2 = std::chrono::high_resolution_clock::now();
+      //     auto duration3 =
+      //         std::chrono::duration_cast<std::chrono::seconds>(stop2 -
+      //         start2);
+      //     cout << "TIME ----> Topological Charge " << duration3.count()
+      //          << "seconds" << endl;
+
+      //     Actions[nstep] = W;
+
+      //     cout << "OBS ----> Wilson Action before: " << Wbefore << endl;
+      //     cout << "OBS ----> Wilson Action: " << W << endl;
+
+      //     cout << "OBS ----> Topological Charge: " << Q << endl;
+      //     Qarr[nstep] = Q;
+      //   }
+      ostringstream filename;
+      filename << "TopologicalCharge" << nconf << ".txt";
+      write(Actions, "Wilson11.txt");
+      write(Qarr, filename.str());
+      U = fill();
+      // }
+      for (auto &t : threads) {
+        t.join();
+      }
     }
-
-    write(Actions, "Wilson11.txt");
-    write(Qarr, "TopologicalCharge.txt");
-
     return 0;
   }
 
-  if (execute == false) {
+  // if (execute == false) {
 
-    Cooling C;
+  //   Cooling C;
 
-    SU3Matrix U1 = su3_generator();
-    SU3Matrix U2 = su3_generator();
-    SU3Matrix U3 = su3_generator();
-    SU3Matrix U4 = su3_generator();
-    SU3Matrix U5 = su3_generator();
-    SU3Matrix U6 = su3_generator();
+  //   SU3Matrix U1 = su3_generator();
+  //   SU3Matrix U2 = su3_generator();
+  //   SU3Matrix U3 = su3_generator();
+  //   SU3Matrix U4 = su3_generator();
+  //   SU3Matrix U5 = su3_generator();
+  //   SU3Matrix U6 = su3_generator();
 
-    SU3Matrix W = U1 * U2 * U3 + U4 * U5 * U6;
-    W = W.conjT();
-    SU3Matrix R = C.CabibboMarinariProjection(W, "R");
-    W *= R;
+  //   SU3Matrix W = U1 * U2 * U3 + U4 * U5 * U6;
+  //   W = W.conjT();
+  //   SU3Matrix R = C.CabibboMarinariProjection(W, "R");
+  //   W *= R;
 
-    SU3Matrix S = C.CabibboMarinariProjection(W, "S");
-    W *= S;
+  //   SU3Matrix S = C.CabibboMarinariProjection(W, "S");
+  //   W *= S;
 
-    SU3Matrix T = C.CabibboMarinariProjection(W, "T");
-    W *= T;
-    W.unitarize();
-    SU3Matrix Prod = W;
-    (Prod.conjT() * Prod).print();
-    // cout << "proddaggerprod" << endl;
-    // (Prod.conjT() * Prod).print();
-    // cout << "detProd" << Prod.det() << endl;
+  //   SU3Matrix T = C.CabibboMarinariProjection(W, "T");
+  //   W *= T;
+  //   W.unitarize();
+  //   SU3Matrix Prod = W;
+  //   (Prod.conjT() * Prod).print();
+  //   // cout << "proddaggerprod" << endl;
+  //   // (Prod.conjT() * Prod).print();
+  //   // cout << "detProd" << Prod.det() << endl;
 
-    // SU3Matrix ProdW = Prod * W;
+  //   // SU3Matrix ProdW = Prod * W;
 
-    // cout << "prodWdaggerprodw" << endl;
-    // (ProdW.conjT() * ProdW).print();
-    // cout << "detProdW" << ProdW.det() << endl;
-  }
+  //   // cout << "prodWdaggerprodw" << endl;
+  //   // (ProdW.conjT() * ProdW).print();
+  //   // cout << "detProdW" << ProdW.det() << endl;
+  // }
 }

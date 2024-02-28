@@ -21,7 +21,7 @@ public:
   Heatbath();
   ~Heatbath();
 
-  void HB_update(Lattice &U, double beta);
+  void HB_update(Lattice &U, double beta, int n_heat);
   SU2Matrix heatbath_subgroup(SU3Matrix W, double beta, const string subgrp);
   vector<double> getA(SU2Matrix W);
   SU3Matrix staple(Lattice U, int x, int y, int z, int t, int mu);

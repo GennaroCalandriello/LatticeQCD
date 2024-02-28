@@ -22,7 +22,7 @@ using Complex = complex<double>;
 Heatbath::Heatbath() {}
 Heatbath::~Heatbath() {}
 
-void Heatbath::HB_update(Lattice &U, const double beta) {
+void Heatbath::HB_update(Lattice &U, const double beta, const int n_heat) {
 
   for (int h = 0; h < n_heat; h++) {
     cout << "heatbath update " << h << endl;
